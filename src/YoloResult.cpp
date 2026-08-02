@@ -4,7 +4,7 @@
 
 
 namespace yolo {
-    cv::Mat YoloResult::plot(const DrawParam& param) {
+    auto YoloResult::plot(const DrawParam& param) const -> cv::Mat {
         switch (task) {
         case YoloTaskType::CLS: {
             auto top5_        = top5();
@@ -278,9 +278,9 @@ namespace yolo {
         std::ostringstream oss;
         oss << "########### YoloResult ###########" << std::endl;
         oss << "id                : " << id         << std::endl;
-        oss << "task              : " << to_string(task)       << std::endl;
-        oss << "yolo version      : " << to_string(version)    << std::endl;
-        oss << "yolo runtime      : " << to_string(target_rt)  << std::endl;
+        oss << "task              : " << toString(task)       << std::endl;
+        oss << "yolo version      : " << toString(version)    << std::endl;
+        oss << "yolo runtime      : " << toString(target_rt)  << std::endl;
         oss << "batch size        : " << batch_size << std::endl;
         oss << "input width       : " << input_w    << std::endl;
         oss << "input height      : " << input_h    << std::endl;

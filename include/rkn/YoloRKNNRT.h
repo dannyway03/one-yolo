@@ -11,15 +11,17 @@ namespace yolo {
     class YoloRKNNRT: public YoloRuntime
     {
     private:
-        rknn_context __ctx = 0;
-        rknn_input_output_num __io_num;
-        rknn_tensor_attr __input_attr;
-        std::vector<rknn_tensor_attr> __output_attrs;
+        rknn_context ctx_ = 0;
+        rknn_input_output_num io_num_{};
+        rknn_tensor_attr input_attr_{};
+        std::vector<rknn_tensor_attr> output_attrs_{};
 
-        bool queryIO();
-    public:
+        auto
+        queryIO() -> bool;
+
+      public:
         YoloRKNNRT(const std::string& model_path);
         ~YoloRKNNRT();
-        virtual std::vector<cv::Mat> inference(const cv::Mat& blob) override;
+        auto inference(const cv::Mat& blob) -> std::vector<cv::Mat> override;
     };
 }

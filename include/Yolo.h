@@ -15,8 +15,8 @@ namespace yolo {
     */
     class Yolo final {
     private:
-        YoloConfig                __cfg;
-        std::shared_ptr<YoloTask> __task = nullptr;
+        YoloConfig                cfg_;
+        std::shared_ptr<YoloTask> task_ = nullptr;
     public:
         Yolo(const YoloConfig& cfg);
         ~Yolo();
@@ -28,7 +28,8 @@ namespace yolo {
          * @param image image to be predicted.
          * @return structured result, single `YoloResult` object.
         */
-        YoloResult predict(const cv::Mat& image);
+        auto
+        predict(const cv::Mat& image) -> YoloResult;
 
         /**
          * @brief
@@ -37,7 +38,8 @@ namespace yolo {
          * @param images a list of images to be predicted with batch mode.
          * @return structured results, a list of `YoloResult` objects.
         */
-        std::vector<YoloResult> predict(const std::vector<cv::Mat>& images);
+        auto
+        predict(const std::vector<cv::Mat>& images) -> std::vector<YoloResult>;
 
         /**
          * @brief
@@ -46,7 +48,8 @@ namespace yolo {
          * @param image image to be predicted.
          * @return structured result, single `YoloResult` object.
         */
-        YoloResult operator()(const cv::Mat& image);
+        auto
+        operator()(const cv::Mat& image) -> YoloResult;
 
         /**
          * @brief
@@ -55,7 +58,8 @@ namespace yolo {
          * @param images a list of images to be predicted with batch mode.
          * @return structured results, a list of `YoloResult` objects.
         */
-        std::vector<YoloResult> operator()(const std::vector<cv::Mat>& images);
+        auto
+        operator()(const std::vector<cv::Mat>& images) -> std::vector<YoloResult>;
 
         /**
          * @brief
@@ -64,6 +68,7 @@ namespace yolo {
          * @param print print summary to console or not.
          * @return summary for `Yolo`.
         */
-        std::string info(bool print = true);
+        auto
+        info(bool print = true) -> std::string;
     };
 }

@@ -2,21 +2,22 @@
 
 namespace yolo {
     YoloOpenCVRT::YoloOpenCVRT(const std::string& model_path, bool use_cuda): YoloRuntime("OpenCV::DNN") {
-        __net = cv::dnn::readNet(model_path);
+        net_ = cv::dnn::readNet(model_path);
         if (use_cuda) {
-            __net.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
-            __net.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
+            net_.setPreferableBackend(cv::dnn::DNN_BACKEND_CUDA);
+            net_.setPreferableTarget(cv::dnn::DNN_TARGET_CUDA);
         }
     }
-    
-    YoloOpenCVRT::~YoloOpenCVRT() {
 
+    YoloOpenCVRT::~YoloOpenCVRT() = default;
+
+    auto
+    YoloOpenCVRT::inference(const cv::Mat& blob) -> std::vector<cv::Mat>
+    {
+      std::vector<cv::Mat> outputs;
+      net_.setInput(blob);
+      net_.forward(outputs, net_.getUnconnectedOutLayersNames());
+      return outputs;
     }
 
-    std::vector<cv::Mat> YoloOpenCVRT::inference(const cv::Mat& blob) {
-        std::vector<cv::Mat> outputs;
-        __net.setInput(blob);
-        __net.forward(outputs, __net.getUnconnectedOutLayersNames());
-        return outputs;
-    }
 }

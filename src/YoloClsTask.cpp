@@ -3,53 +3,58 @@
 #include "YoloClsTask.h"
 
 namespace yolo {
-    
-    YoloClsTask::YoloClsTask(const YoloConfig& cfg): YoloTask(cfg) {
 
-    }
-    
-    YoloClsTask::~YoloClsTask() {
+YoloClsTask::YoloClsTask(const YoloConfig& cfg) : YoloTask(cfg) {}
 
-    }
+YoloClsTask::~YoloClsTask() = default;
 
-    cv::Mat YoloClsTask::softmax(const cv::Mat& logits) {
-        assert(logits.dims == 2);
+auto
+YoloClsTask::softmax(const cv::Mat& logits) -> cv::Mat
+{
+  assert(logits.dims == 2);
 
-        cv::Mat probs = cv::Mat::zeros(logits.size(), logits.type());
+  cv::Mat probs = cv::Mat::zeros(logits.size(), logits.type());
 
-        for (int i = 0; i < logits.rows; ++i) {
-            cv::Mat row = logits.row(i);
+  for (int i = 0; i < logits.rows; ++i)
+  {
+    cv::Mat row = logits.row(i);
 
-            double maxVal;
-            cv::minMaxLoc(row, nullptr, &maxVal);
+    double max_val;
+    cv::minMaxLoc(row, nullptr, &max_val);
 
-            cv::Mat expRow;
-            cv::exp(row - maxVal, expRow);
+    cv::Mat exp_row;
+    cv::exp(row - max_val, exp_row);
 
-            double sumExp = cv::sum(expRow)[0];
-            expRow /= sumExp;
+    double sum_exp = cv::sum(exp_row)[0];
+    exp_row /= sum_exp;
 
-            expRow.copyTo(probs.row(i));
-        }
-        return probs;
-    }
+    exp_row.copyTo(probs.row(i));
+  }
+  return probs;
+}
 
-    bool YoloClsTask::is_prob_distribution(const cv::Mat& out, double eps) {
-        assert(out.dims == 2);
+auto
+YoloClsTask::is_prob_distribution(const cv::Mat& out, double eps) -> bool
+{
+  assert(out.dims == 2);
 
-        for (int i = 0; i < out.rows; ++i) {
-            cv::Mat row = out.row(i);
+  for (int i = 0; i < out.rows; ++i)
+  {
+    cv::Mat row = out.row(i);
 
-            double minVal, maxVal;
-            cv::minMaxLoc(row, &minVal, &maxVal);
-            double sum = cv::sum(row)[0];
+    double min_val, max_val;
+    cv::minMaxLoc(row, &min_val, &max_val);
+    double sum = cv::sum(row)[0];
 
-            if (minVal < 0.0) return false;
-            if (maxVal > 1.0) return false;
-            if (std::abs(sum - 1.0) > eps) return false;
-        }
-        return true;
-    }
+    if (min_val < 0.0)
+      return false;
+    if (max_val > 1.0)
+      return false;
+    if (std::abs(sum - 1.0) > eps)
+      return false;
+  }
+  return true;
+}
 
     void YoloClsTask::postprocess_one(
         const std::vector<cv::Mat>& raw_outputs,
@@ -87,7 +92,7 @@ namespace yolo {
             return;
         }
 
-        assert(num_classes == _cfg.num_classes);
+        assert(num_classes == _cfg.num_classes_);
         std::vector<int> indices(num_classes);
         std::iota(indices.begin(), indices.end(), 0);
 
@@ -106,7 +111,7 @@ namespace yolo {
 
         /* fill YoloResult with YoloClsObjs from high score to low */
         for (size_t i = 0; i < num_classes; i++) {
-            YoloClsObj cls_obj{cls_ids[i], scores[i], _cfg.names[cls_ids[i]]};
+            YoloClsObj cls_obj{cls_ids[i], scores[i], _cfg.names_[cls_ids[i]]};
             result.classes.emplace_back(cls_obj);
         }
     } 

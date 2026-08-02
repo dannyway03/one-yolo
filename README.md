@@ -23,36 +23,147 @@ A unified C++ toolkit for YOLO `v5/v8/v11/v26/...`, covering `classification/det
 
 ## 🚀 quick start
 
-### basics
-1. C++ >= 17
-2. GCC >= 7.5
-3. OpenCV == 4.13
-4. CUDA/ONNXRuntime/TensorRT/OpenVINO/RKNN/... are optional
+### requirements
+1. C++ >= 17, clang++ >= 20 or GCC >= 12
+2. CMake >= 3.21 (for preset support)
+3. OpenCV >= 4.10
+4. ONNXRuntime / OpenVINO / TensorRT / RKNN — optional, enable via build flags
 
-### build
-1. run `git clone https://github.com/sherlockchou86/one-yolo.git`
-2. run `cd one-yolo && mkdir build && cd build`
-3. run `cmake .. && make -j8` or click `debug` button to run samples directly if you have opened the project using VS Code
+### build with CMakePresets (recommended)
 
-> you must put test data(models&video&images) at the same directory as one-yolo first before runing the samples.
+```bash
+git clone https://github.com/sherlockchou86/one-yolo.git
+cd one-yolo
+
+# configure (choose Debug / Release / RelWithDebInfo / rr)
+cmake --preset Release \
+  -DBUILD_WITH_ORT=ON \   # ONNXRuntime
+  -DBUILD_WITH_OVN=ON     # OpenVINO
+
+# build everything
+cmake --build --preset Release
+
+# or build specific targets
+cmake --build --preset Release --target det cls seg pose obb bench
+```
+
+Available `-DBUILD_WITH_*` flags:
+
+| flag | backend |
+|------|---------|
+| `BUILD_WITH_ORT=ON` | ONNXRuntime (CPU / CUDA) |
+| `BUILD_WITH_OVN=ON` | OpenVINO (CPU / iGPU / AUTO) |
+| `BUILD_WITH_TRT=ON` | TensorRT (NVIDIA GPU) |
+| `BUILD_WITH_RKN=ON` | RKNN (RockChip NPU) |
+| `BUILD_WITH_CML=ON` | CoreML (Apple) |
+| `BUILD_WITH_PDL=ON` | PaddlePaddle |
+| `BUILD_WITH_CAN=ON` | CANN (HuaWei NPU) |
+
+Without any flag, OpenCV::DNN is used as the default backend.
+
+### legacy cmake (no presets)
+
+```bash
+mkdir build && cd build
+cmake .. -DBUILD_WITH_ORT=ON -DBUILD_WITH_OVN=ON
+make -j8
+```
+
+### run samples
+
+Samples live in `build/<preset>/samples/`. All share the same flags:
 
 ```
-build options when run cmake command:
--DBUILD_WITH_ORT=ON   # enable ONNXRuntime as inference backend
--DBUILD_WITH_OVN=ON   # enable OpenVINO(Intel Platform) as inference backend
--DBUILD_WITH_TRT=ON   # enable TensorRT(Nvidia/CUDA Platform) as inference backend
--DBUILD_WITH_RKN=ON   # enable RKNN(RockChip Platform) as inference backend
--DBUILD_WITH_CML=ON   # enable CoreML(Apple Platform) as inference backend
--DBUILD_WITH_PDL=ON   # enable PaddlePaddle as inference backend
--DBUILD_WITH_CAN=ON   # enable CANN(HuaWei Platform) as inference backend
--DBUILD_WITH_DEL=ON   # enable Denglin's SDK(Denglin/登临 Platform) as inference backend
--DBUILD_WITH_CAB=ON   # enable Cambricon'SDK(Cambricon/寒武纪 Platform) as inference backend
-...
-
-if you just run `cmake ..` without any options, 
-one-yolo will depend on OpenCV::DNN module as inference backend by default,
-so OpenCV is required for one-yolo, CUDA is optional when building OpenCV from source code. 
+--model      <path>            .onnx or .xml model file
+--version    yolox|yolo26|yolo11|yolo8|yolo5|yolo5u
+--backend    ort|ovn|dnn       inference backend
+--device     cpu|gpu|auto|cuda
+--source     <path|0|1|...>   image, video file, or webcam index
+--input-w    <int>             model input width  (default: 640)
+--input-h    <int>             model input height (default: 640)
+--classes    <int>             number of classes  (default: 80)
+--names      <a,b,c,...>       comma-separated class names
+--conf       <float>           confidence threshold (default: 0.25)
+--iou        <float>           NMS IoU threshold   (default: 0.45)
+--scale      <float>           display scale       (default: 1.0)
+--no-json                      suppress per-frame JSON output
+--no-csv                       suppress per-frame CSV output
+--no-track                     disable SORT tracker (det/seg/pose)
 ```
+
+**Detection — YOLOX-Nano on OpenVINO CPU**
+```bash
+./det --model models/yolox_nano_1x3x384x640_decoded.xml \
+      --version yolox --backend ovn --input-w 640 --input-h 384 \
+      --source media/crowd_mall.mp4
+```
+
+**Detection — YOLO11n on ONNXRuntime, webcam**
+```bash
+./det --model models/yolo11n.onnx --version yolo11 --backend ort \
+      --source 0 --no-json --no-csv
+```
+
+**Detection — custom 3-class model**
+```bash
+./det --model models/fire_smoke_yolo8s.onnx \
+      --version yolo8 --backend ovn --device cpu \
+      --classes 3 --names "fire,smoke,light" \
+      --source media/fire.mp4
+```
+
+**Classification — YOLO26n-cls on ONNXRuntime**
+```bash
+./cls --model models/yolo26n-cls.onnx --version yolo26 --backend ort \
+      --input-w 224 --input-h 224 --classes 1000 \
+      --source test_images/cat.jpg
+```
+
+**Segmentation — YOLO8n-seg on OpenVINO AUTO**
+```bash
+./seg --model models/yolo8n-seg.onnx --version yolo8 \
+      --backend ovn --device auto \
+      --source media/crowd_mall.mp4
+```
+
+**Pose estimation — YOLO11n-pose on OpenVINO CPU**
+```bash
+./pose --model models/yolo11n-pose.onnx --version yolo11 --backend ovn \
+       --classes 1 --names person \
+       --source media/people.mp4
+```
+
+**OBB — YOLO8n-obb on ONNXRuntime**
+```bash
+./obb --model models/yolo8n-obb.onnx --version yolo8 --backend ort \
+      --input-w 1024 --input-h 1024 \
+      --classes 15 --names "plane,ship,storage tank,..." \
+      --source test_images/satellite.png
+```
+
+### bench — pipeline latency benchmark
+
+Measures the full pipeline (preprocess + inference + postprocess) with percentile stats and optional CSV logging:
+
+```bash
+# YOLOX-Nano: OVN vs ORT side by side
+./bench --model models/yolox_nano_1x3x384x640_decoded.xml \
+        --version yolox --backend ovn --device cpu \
+        --input-w 640 --input-h 384 \
+        --warmup 10 --iterations 100 \
+        --image media/frame.jpg --csv results.csv
+
+./bench --model models/yolox_nano_1x3x384x640_decoded.onnx \
+        --version yolox --backend ort \
+        --input-w 640 --input-h 384 \
+        --warmup 10 --iterations 100 \
+        --image media/frame.jpg --csv results.csv
+
+# omit --image to use random noise (pure throughput, no I/O)
+./bench --model models/yolo11n.onnx --version yolo11 --backend ort --iterations 200
+```
+
+`results.csv` accumulates one row per run — compare OVN vs ORT vs DNN across versions in a single file.
 
 ### hello one-yolo
 
@@ -65,16 +176,16 @@ using namespace yolo;
 int main() {
     /* 1. construct YoloConfig */
     YoloConfig cfg;
-    cfg.desc        = "vehicle detection task using yolov8s(custom model)";
-    cfg.version     = YoloVersion::YOLO8;
-    cfg.task        = YoloTaskType::DET;
-    cfg.target_rt   = YoloTargetRT::OPENCV_CUDA;
-    cfg.model_path  = "./vp_data/models/det_cls/vehicel_v8s-det_c6_20260205.onnx";
-    cfg.input_w     = 640;
-    cfg.input_h     = 384;
-    cfg.batch_size  = 1;
-    cfg.num_classes = 6;
-    cfg.names       = {"person", "car", "bus", "truck", "2wheel", "other"};
+    cfg.desc_        = "vehicle detection task using yolov8s(custom model)";
+    cfg.version_     = YoloVersion::YOLO8;
+    cfg.task_        = YoloTaskType::DET;
+    cfg.target_rt_   = YoloTargetRT::OPENCV_CUDA;
+    cfg.model_path_  = "./vp_data/models/det_cls/vehicel_v8s-det_c6_20260205.onnx";
+    cfg.input_w_     = 640;
+    cfg.input_h_     = 384;
+    cfg.batch_size_  = 1;
+    cfg.num_classes_ = 6;
+    cfg.names_       = {"person", "car", "bus", "truck", "2wheel", "other"};
 
     /* 2. create Yolo using YoloConfig */
     auto model = Yolo(cfg);
@@ -269,5 +380,6 @@ id,cls_id,conf,label,track_id
 
 ## 📚 references
 
-1. [Samples](./samples/)
-2. [VideoPipe](https://github.com/sherlockchou86/VideoPipe) for integrating Yolo
+1. [Samples](./samples/) — `det` / `cls` / `seg` / `pose` / `obb` unified CLI apps + `common.hpp`
+2. [Tools](./tools/) — `bench` latency benchmark, `test_yolox_img` headless image test
+3. [VideoPipe](https://github.com/sherlockchou86/VideoPipe) for integrating Yolo

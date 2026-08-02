@@ -10,70 +10,76 @@ namespace yolo {
         const std::string& model_path, 
         const std::string& device):
         YoloRuntime("OpenVINO") {
-        auto model = __core.read_model(model_path);
+        auto model = core_.read_model(model_path);
 
         ov::AnyMap config;
+        // TODO(perf): for throughput-oriented video pipelines (batch > 1 or async),
+        // switch to PerformanceMode::THROUGHPUT and set ov::num_streams to a value
+        // > 1 so the runtime can schedule across cores. For real-time single-stream
+        // use, LATENCY is correct.
         config[ov::hint::performance_mode.name()] =
             ov::hint::PerformanceMode::LATENCY;
+        // TODO(perf): add `config[ov::cache_dir.name()] = "/tmp/ov_cache"` to skip
+        // model recompilation on subsequent launches (saves 1-5 s on GPU/NPU).
 
-        __compiled_model = __core.compile_model(model, device, config);
-    }
-    
-    YoloOVNRT::~YoloOVNRT() {
-
+        compiled_model_ = core_.compile_model(model, device, config);
     }
 
-    std::vector<cv::Mat> YoloOVNRT::inference(const cv::Mat& blob) {
-        // [batch, 3, input_h, input_w] or [batch, input_h, input_w, 3]
-        assert(blob.isContinuous());
-        assert(blob.type() == CV_32F);
-        assert(blob.dims == 4);
+    YoloOVNRT::~YoloOVNRT() = default;
 
-        int d0 = blob.size[0];
-        int d1 = blob.size[1];
-        int d2 = blob.size[2];
-        int d3 = blob.size[3];
+    auto
+    YoloOVNRT::inference(const cv::Mat& blob) -> std::vector<cv::Mat>
+    {
+      // [batch, 3, input_h, input_w] or [batch, input_h, input_w, 3]
+      assert(blob.isContinuous());
+      assert(blob.type() == CV_32F);
+      assert(blob.dims == 4);
 
-        auto infer_request =
-            __compiled_model.create_infer_request();
-        
-        // zero copy
-        ov::Tensor input_tensor(
-            ov::element::f32,
-            { (size_t)d0, (size_t)d1,
-            (size_t)d2, (size_t)d3 },
-            const_cast<float*>(
-                reinterpret_cast<const float*>(blob.data)
-            )
-        );
+      int d0 = blob.size[0];
+      int d1 = blob.size[1];
+      int d2 = blob.size[2];
+      int d3 = blob.size[3];
 
-        infer_request.set_input_tensor(input_tensor);
-        infer_request.infer();
+      // TODO(perf): create_infer_request() allocates internal buffers on every call
+      // (~2-5 ms overhead). Pre-allocate one (or a pool for async) in the constructor
+      // and reuse it across frames. For a single-threaded video loop this is trivial:
+      //   store `ov::InferRequest __infer_request` as a member and call only once.
+      auto infer_request = compiled_model_.create_infer_request();
 
-        std::vector<cv::Mat> outputs;
-        const auto& output_ports = __compiled_model.outputs();
+      // zero copy
+      ov::Tensor input_tensor(ov::element::f32, {(size_t)d0, (size_t)d1, (size_t)d2, (size_t)d3},
+                              const_cast<float*>(reinterpret_cast<const float*>(blob.data)));
 
-        for (size_t i = 0; i < output_ports.size(); ++i) {
-            ov::Tensor out_tensor = infer_request.get_output_tensor(i);
-            const ov::Shape& shape = out_tensor.get_shape();
+      infer_request.set_input_tensor(input_tensor);
+      // TODO(perf): infer() is synchronous. For video pipelines, replace with
+      // start_async() + wait() and double-buffer two InferRequests to overlap
+      // CPU preprocessing of frame N+1 with GPU/NPU inference on frame N.
+      infer_request.infer();
 
-            float* out_data = out_tensor.data<float>();
+      std::vector<cv::Mat> outputs;
+      const auto& output_ports = compiled_model_.outputs();
 
-            int mat_dims = static_cast<int>(shape.size());
-            std::vector<int> mat_sizes(mat_dims);
-            for (int d = 0; d < mat_dims; ++d)
-                mat_sizes[d] = static_cast<int>(shape[d]);
+      for (size_t i = 0; i < output_ports.size(); ++i)
+      {
+        ov::Tensor out_tensor = infer_request.get_output_tensor(i);
+        const ov::Shape& shape = out_tensor.get_shape();
 
-            cv::Mat out_mat(
-                mat_dims,
-                mat_sizes.data(),
-                CV_32F,
-                out_data
-            );
-            // clone to own the buffer data
-            outputs.push_back(out_mat.clone());
-        }
+        auto* out_data = out_tensor.data<float>();
 
-        return outputs;
+        int mat_dims = static_cast<int>(shape.size());
+        std::vector<int> mat_sizes(mat_dims);
+        for (int d = 0; d < mat_dims; ++d)
+          mat_sizes[d] = static_cast<int>(shape[d]);
+
+        cv::Mat out_mat(mat_dims, mat_sizes.data(), CV_32F, out_data);
+        // TODO(perf): clone() copies the full output tensor on every frame.
+        // If the InferRequest is reused (see above), the tensor lifetime is
+        // tied to it, so clone is necessary — but with a persistent request
+        // the postprocessor can read directly from out_data without copying.
+        outputs.push_back(out_mat.clone());
+      }
+
+      return outputs;
     }
+
 }

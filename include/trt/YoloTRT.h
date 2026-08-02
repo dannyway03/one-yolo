@@ -11,17 +11,19 @@ namespace yolo {
     class YoloTRT: public YoloRuntime
     {
     private:
-        nvinfer1::IRuntime* __runtime = nullptr;
-        nvinfer1::ICudaEngine* __engine = nullptr;
-        nvinfer1::IExecutionContext* __context = nullptr;
+        nvinfer1::IRuntime* runtime_ = nullptr;
+        nvinfer1::ICudaEngine* engine_ = nullptr;
+        nvinfer1::IExecutionContext* context_ = nullptr;
 
-        std::vector<void*> __device_buffers;
-        std::vector<std::vector<int64_t>> __output_shapes;
+        std::vector<void*> device_buffers_{};
+        std::vector<std::vector<int64_t>> output_shapes_{};
 
-        void allocate_buffers();
-    public:
+        void
+        allocateBuffers();
+
+      public:
         YoloTRT(const std::string& model_path);
         ~YoloTRT();
-        virtual std::vector<cv::Mat> inference(const cv::Mat& blob) override;
+        auto inference(const cv::Mat& blob) -> std::vector<cv::Mat> override;
     };
 }

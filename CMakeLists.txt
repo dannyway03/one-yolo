@@ -48,10 +48,11 @@ list(APPEND ONE_YOLO_DEPEND_LIBS ${OpenCV_LIBS})
 # make sure onnxruntime installed and include & libs path could be found by cmake
 if(BUILD_WITH_ORT)
     #include_directories("include path to onnxruntime")
-    #link_directories("libs path to onnxruntime") 
+    #link_directories("libs path to onnxruntime")
+    find_package(onnxruntime REQUIRED)
     add_definitions(-DBUILD_WITH_ORT)
     list(APPEND ONE_YOLO_DEPEND_SRCS ${ORT_SRCS})
-    list(APPEND ONE_YOLO_DEPEND_LIBS onnxruntime)
+    list(APPEND ONE_YOLO_DEPEND_LIBS onnxruntime::onnxruntime)
 endif()
 # enable openvino, 
 # make sure openvino installed and include & libs path could be found by cmake
@@ -84,6 +85,14 @@ endif()
 
 add_library(${PROJECT_NAME} SHARED ${ONE_YOLO_DEPEND_SRCS})
 target_link_libraries(${PROJECT_NAME} ${ONE_YOLO_DEPEND_LIBS})
+
+##########################
+# build one-yolo tools #
+add_executable(test_yolox_img tools/test_yolox_img.cpp)
+target_link_libraries(test_yolox_img ${PROJECT_NAME})
+
+add_executable(bench tools/bench.cpp)
+target_link_libraries(bench ${PROJECT_NAME})
 
 ##########################
 # build one-yolo samples #

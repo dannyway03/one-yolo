@@ -1,16 +1,17 @@
 #include "YoloRuntime.h"
 
+#include <utility>
 
 namespace yolo {
-    YoloRuntime::YoloRuntime(const std::string& rt_name): __rt_name(rt_name) {
 
-    }
-    
-    YoloRuntime::~YoloRuntime() {
+YoloRuntime::YoloRuntime(std::string rt_name) : rt_name_(std::move(rt_name)) {}
 
-    }
+YoloRuntime::~YoloRuntime() = default;
 
-    std::string YoloRuntime::to_string() {
-        return __rt_name;
-    }
+auto
+YoloRuntime::toString() -> std::string
+{
+  return rt_name_;
+}
+
 }

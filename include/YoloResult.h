@@ -54,7 +54,7 @@ namespace yolo {
          * 
          * @param param parameter for drawing.
         */
-        cv::Mat     plot(const DrawParam& param = DrawParam());
+        auto plot(const DrawParam& param = DrawParam()) const -> cv::Mat;
 
         /**
          * @brief

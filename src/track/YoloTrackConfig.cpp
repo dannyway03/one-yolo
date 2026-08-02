@@ -1,11 +1,13 @@
 #include "track/YoloTrackConfig.h"
 
 namespace yolo {
-    std::string to_string(YoloTrackAlgo algo) {
 
-    }
+auto
+to_string(YoloTrackAlgo algo) -> std::string
+{}
 
-    std::string to_string(YoloTrackLoc loc) {
-        
-    }
+auto
+to_string(YoloTrackLoc loc) -> std::string
+{}
+
 }

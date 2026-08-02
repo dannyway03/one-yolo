@@ -1,0 +1,88 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER": "/usr/bin/clang++-20",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "CMAKE_CXX_FLAGS": "-Wall -Wextra",
+        "onnxruntime_DIR": "/home/briox/Software/cpp/libs/onnxruntime_v1.22.2/install/Ubuntu/OVEP/RelWithDebInfo/lib/cmake/onnxruntime",
+        "OpenCV_DIR": "/home/briox/Software/cpp/libs/opencv-4.10.0/installGCC/tbbOrtOV/lib/cmake/opencv4"
+      }
+    },
+    {
+      "name": "Debug",
+      "description": "Debug build with full logging",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_CXX_FLAGS_DEBUG": "-O0 -g3 -fstandalone-debug -gdwarf-4 -fno-omit-frame-pointer -fno-inline -fno-optimize-sibling-calls -fno-elide-constructors"
+      }
+    },
+    {
+      "name": "Release",
+      "description": "Optimized release build",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG -march=native -mtune=native -openmp -funroll-loops -ffast-math -fstrict-aliasing -fvectorize -fslp-vectorize -fomit-frame-pointer -fPIC -flto=thin"
+      }
+    },
+    {
+      "name": "RelWithDebInfo",
+      "description": "Release with debug symbols for profiling",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g -gdwarf-4 -fno-omit-frame-pointer -fno-optimize-sibling-calls"
+      }
+    },
+    {
+      "name": "Custom configure preset",
+      "displayName": "Custom configure preset",
+      "description": "Sets Ninja generator, build and install directory",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+      }
+    },
+    {
+      "name": "rr",
+      "displayName": "RR (Clang, rr-safe, optimized)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_CXX_COMPILER": "clang++-20",
+        "CMAKE_CXX_FLAGS_RELWITHDEBINFO": "-O2 -g -gdwarf-4 -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-inline-functions"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "Debug",
+      "configurePreset": "Debug",
+      "jobs": 6
+    },
+    {
+      "name": "Release",
+      "configurePreset": "Release",
+      "jobs": 6
+    },
+    {
+      "name": "RelWithDebInfo",
+      "configurePreset": "RelWithDebInfo",
+      "jobs": 6
+    },
+    {
+      "name": "rr",
+      "configurePreset": "rr",
+      "jobs": 6
+    }
+  ]
+}

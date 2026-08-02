@@ -10,18 +10,18 @@ namespace yolo {
     class YoloONNXRT: public YoloRuntime
     {
     private:
-        Ort::Env __env;
-        Ort::Session __session {nullptr};
-        Ort::SessionOptions __session_options;
-        void ort_forward(
-            const cv::Mat& input_4d,
-            std::vector<cv::Mat>& outputs
-        );
-    public:
+        Ort::Env env_;
+        Ort::Session session_ {nullptr};
+        Ort::SessionOptions session_options_;
+        void
+        ortForward(const cv::Mat& input_4d, std::vector<cv::Mat>& outputs);
+
+      public:
         YoloONNXRT(
             const std::string& model_path, 
             bool use_cuda = true);
         ~YoloONNXRT();
-        virtual std::vector<cv::Mat> inference(const cv::Mat& blob) override;
+        auto
+        inference(const cv::Mat& blob) -> std::vector<cv::Mat> override;
     };
 }

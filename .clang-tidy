@@ -1,0 +1,136 @@
+---
+InheritParentConfig: false
+Checks: >
+  -*,
+  readability-identifier-naming,
+  readability-redundant-*,
+  readability-const-return-type,
+  readability-container-size-empty,
+  readability-make-member-function-const,
+  modernize-*,
+  performance-*,
+  bugprone-*,
+  -*easily-swappable-parameters,
+  clang-analyzer-core.*,
+  clang-analyzer-cplusplus.*,
+  cppcoreguidelines-pro-type-member-init,
+  misc-redundant-expression,
+  bugprone-redundant-branch-condition,
+  -bugprone-signed-char-misuse,
+  -performance-enum-size,
+  -*narrowing-conversions*,
+WarningsAsErrors: ''
+HeaderFileExtensions:
+  - h
+  - hh
+  - hpp
+  - hxx
+ImplementationFileExtensions:
+  - c
+  - cc
+  - cpp
+  - cxx
+HeaderFilterRegex: '^(src|demo|apps|test|include)/'
+FormatStyle: file
+UseColor: true
+CheckOptions:
+  # =========================
+  # Namespace
+  # =========================
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+
+  # =========================
+  # Types
+  # =========================
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.UnionCase
+    value: CamelCase
+  - key: readability-identifier-naming.TemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.NonTypeTemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypeAliasCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypedefCase
+    value: CamelCase
+
+  # =========================
+  # Functions
+  # =========================
+  - key: readability-identifier-naming.FunctionCase
+    value: camelBack
+  - key: readability-identifier-naming.MethodCase
+    value: camelBack
+
+  # =========================
+  # Variables
+  # =========================
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+
+  # =========================
+  # Members
+  # =========================
+  - key: readability-identifier-naming.MemberCase
+    value: lower_case
+  - key: readability-identifier-naming.MemberSuffix
+    value: _
+
+  # =========================
+  # Enum constants
+  # =========================
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+
+  # =========================
+  # Constants
+  # =========================
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.GlobalConstantPrefix
+    value: k
+  - key: readability-identifier-naming.StaticConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.StaticConstantPrefix
+    value: k
+  - key: readability-identifier-naming.ConstexprVariableCase
+    value: CamelCase
+  - key: readability-identifier-naming.ConstexprVariablePrefix
+    value: k
+
+  # =========================
+  # Initialization
+  # =========================
+  - key: cppcoreguidelines-pro-type-member-init
+    value: 1
+  - key: modernize-use-default-member-init.UseAssignment
+    value: 'false'
+
+  # =========================
+  # Null pointer enforcement
+  # =========================
+  - key: modernize-use-nullptr.NullMacros
+    value: 'NULL'
+
+  # =========================
+  # Override enforcement
+  # =========================
+  - key: modernize-use-override
+    value: 1
+
+  # =========================
+  # Magic numbers (ignored)
+  # =========================
+  - key: readability-magic-numbers.IgnoredIntegerValues
+    value: '0;1;2;-1'
+  - key: readability-magic-numbers.IgnoredFloatingPointValues
+    value: '0.0;1.0;-1.0'
+

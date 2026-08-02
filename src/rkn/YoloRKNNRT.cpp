@@ -18,7 +18,7 @@ namespace yolo {
         file.close();
 
         // throw errors directly for C style API in rknn
-        int ret = rknn_init(&__ctx, model_data.data(), model_size, 0, nullptr);
+        int ret = rknn_init(&ctx_, model_data.data(), model_size, 0, nullptr);
         if (ret < 0) {
             throw std::runtime_error("rknn init failed!");
         }
@@ -29,40 +29,46 @@ namespace yolo {
     }
     
     YoloRKNNRT::~YoloRKNNRT() {
-        if (__ctx) {
-            rknn_destroy(__ctx);
-            __ctx = 0;
+        if (ctx_) {
+            rknn_destroy(ctx_);
+            ctx_ = 0;
         }
     }
 
-    bool YoloRKNNRT::queryIO() {
-        int ret = rknn_query(__ctx, RKNN_QUERY_IN_OUT_NUM, &__io_num, sizeof(__io_num));
-        if (ret < 0) {
-            return false;
+    auto
+    YoloRKNNRT::queryIO() -> bool
+    {
+      int ret = rknn_query(ctx_, RKNN_QUERY_IN_OUT_NUM, &io_num_, sizeof(io_num_));
+      if (ret < 0)
+      {
+        return false;
+      }
+
+      memset(&input_attr_, 0, sizeof(input_attr_));
+      input_attr_.index = 0;
+
+      ret = rknn_query(ctx_, RKNN_QUERY_INPUT_ATTR, &input_attr_, sizeof(input_attr_));
+      if (ret < 0)
+      {
+        return false;
+      }
+
+      output_attrs_.resize(io_num_.n_output);
+      for (int i = 0; i < io_num_.n_output; ++i)
+      {
+        memset(&output_attrs_[i], 0, sizeof(rknn_tensor_attr));
+        output_attrs_[i].index = i;
+
+        ret = rknn_query(ctx_, RKNN_QUERY_OUTPUT_ATTR, &output_attrs_[i], sizeof(rknn_tensor_attr));
+        if (ret < 0)
+        {
+          return false;
         }
-
-        memset(&__input_attr, 0, sizeof(__input_attr));
-        __input_attr.index = 0;
-
-        ret = rknn_query(__ctx, RKNN_QUERY_INPUT_ATTR, &__input_attr, sizeof(__input_attr));
-        if (ret < 0) {
-            return false;
-        }
-
-        __output_attrs.resize(__io_num.n_output);
-        for (int i = 0; i < __io_num.n_output; ++i) {
-            memset(&__output_attrs[i], 0, sizeof(rknn_tensor_attr));
-            __output_attrs[i].index = i;
-
-            ret = rknn_query(__ctx, RKNN_QUERY_OUTPUT_ATTR, &__output_attrs[i], sizeof(rknn_tensor_attr));
-            if (ret < 0) {
-                return false;
-            }
-        }
-        return true;
+      }
+      return true;
     }
 
-    std::vector<cv::Mat> YoloRKNNRT::inference(const cv::Mat& blob) {
+    auto YoloRKNNRT::inference(const cv::Mat& blob) -> std::vector<cv::Mat> {
         // [batch, 3, input_h, input_w] or [batch, input_h, input_w, 3]
         assert(blob.isContinuous());
         assert(blob.type() == CV_32F);
@@ -79,43 +85,43 @@ namespace yolo {
         input.fmt   = RKNN_TENSOR_NHWC;
         input.buf   = (void*)blob.data;
 
-        int ret = rknn_inputs_set(__ctx, 1, &input);
+        int ret = rknn_inputs_set(ctx_, 1, &input);
         if (ret < 0) {
             return outputs;
         }
 
         // run
-        ret = rknn_run(__ctx, nullptr);
+        ret = rknn_run(ctx_, nullptr);
         if (ret < 0) {
             return outputs;
         }
 
         // get rknn_output
-        std::vector<rknn_output> rknn_outputs(__io_num.n_output);
-        for (int i = 0; i < __io_num.n_output; ++i) {
+        std::vector<rknn_output> rknn_outputs(io_num_.n_output);
+        for (int i = 0; i < io_num_.n_output; ++i) {
             memset(&rknn_outputs[i], 0, sizeof(rknn_output));
             rknn_outputs[i].index = i;
             rknn_outputs[i].want_float = 1;
         }
 
-        ret = rknn_outputs_get(__ctx, __io_num.n_output, rknn_outputs.data(), nullptr);
+        ret = rknn_outputs_get(ctx_, io_num_.n_output, rknn_outputs.data(), nullptr);
         if (ret < 0) {
             return outputs;
         }
 
         // rknn_output -> cv::Mat
-        for (int i = 0; i < __io_num.n_output; ++i) {
-            const rknn_tensor_attr& attr = __output_attrs[i];
+        for (int i = 0; i < io_num_.n_output; ++i) {
+            const rknn_tensor_attr& attr = output_attrs_[i];
 
             std::vector<int> dims(attr.dims, attr.dims + attr.n_dims);
-            float* out_data = (float*)rknn_outputs[i].buf;
+            auto* out_data = (float*)rknn_outputs[i].buf;
 
             // clone to own the buffer data
             cv::Mat out_mat = cv::Mat(dims.size(), dims.data(), CV_32F, out_data).clone();
             outputs.push_back(out_mat);
         }
 
-        rknn_outputs_release(__ctx, __io_num.n_output, rknn_outputs.data());
+        rknn_outputs_release(ctx_, io_num_.n_output, rknn_outputs.data());
         return outputs;
     }
 }

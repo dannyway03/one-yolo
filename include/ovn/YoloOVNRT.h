@@ -10,13 +10,14 @@ namespace yolo {
     class YoloOVNRT: public YoloRuntime
     {
     private:
-        ov::Core __core;
-        ov::CompiledModel __compiled_model;
+        ov::Core core_;
+        ov::CompiledModel compiled_model_;
     public:
         YoloOVNRT(
             const std::string& model_path, 
             const std::string& device = "CPU");
         ~YoloOVNRT();
-        virtual std::vector<cv::Mat> inference(const cv::Mat& blob) override;
+        auto
+        inference(const cv::Mat& blob) -> std::vector<cv::Mat> override;
     };
 }

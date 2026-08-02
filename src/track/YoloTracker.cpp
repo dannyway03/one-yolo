@@ -3,19 +3,17 @@
 
 namespace yolo {
     YoloTracker::YoloTracker(
-        const YoloTrackConfig& cfg): __cfg(cfg) {
+        const YoloTrackConfig& cfg): cfg_(cfg) {
         init();
     }
 
-    YoloTracker::~YoloTracker() {
-
-    }
+    YoloTracker::~YoloTracker() = default;
 
     void YoloTracker::init() {
         // choose track algorithm
-        switch (__cfg.algo) {
+        switch (cfg_.algo) {
         case YoloTrackAlgo::SORT: {
-            __tracker = std::make_shared<SortTrackAlgo>(__cfg);
+            tracker_ = std::make_shared<SortTrackAlgo>(cfg_);
             break;
         }
         case YoloTrackAlgo::BYTE_TRACK: {
@@ -28,8 +26,8 @@ namespace yolo {
         }
 
         // initialize status
-        __tracking_points.clear();
-        __tracking_miss_times.clear();
+        tracking_points_.clear();
+        tracking_miss_times_.clear();
     }
 
     void YoloTracker::reset() {
@@ -54,7 +52,7 @@ namespace yolo {
         const std::vector<std::vector<float>>& embeddings, 
         std::vector<int>& track_ids
     ) {
-        (*__tracker).run(boxes, embeddings, track_ids);
+        (*tracker_).run(boxes, embeddings, track_ids);
     }
 
     void YoloTracker::postprocess(
@@ -76,7 +74,7 @@ namespace yolo {
             
             cv::Point track_point;
 
-            switch (__cfg.loc) {
+            switch (cfg_.loc) {
             case YoloTrackLoc::CENTER: {
                 track_point.x = box.x + box.width / 2;
                 track_point.y = box.y + box.height / 2;
@@ -88,7 +86,7 @@ namespace yolo {
                 break;
             }
             case YoloTrackLoc::BOTTOM_CUSTOM: {
-                track_point.x = box.x + int(box.width * __cfg.loc_f);
+                track_point.x = box.x + int(box.width * cfg_.loc_f);
                 track_point.y = box.y + box.height;
                 break;
             }
@@ -97,9 +95,9 @@ namespace yolo {
                 break;
             }
 
-            __tracking_points[track_id].emplace_back(track_point);
+            tracking_points_[track_id].emplace_back(track_point);
             // reset to 0 since it got hit
-            __tracking_miss_times[track_id] = 0;
+            tracking_miss_times_[track_id] = 0;
 
             /* update track id & track points for YoloResult via indice directly
                important: they have the same indice order
@@ -107,17 +105,17 @@ namespace yolo {
             switch (res.task) {
             case YoloTaskType::DET: {
                 res.detections[i].track_id = track_id;
-                res.detections[i].track_points = __tracking_points[track_id];
+                res.detections[i].track_points = tracking_points_[track_id];
                 break;
             }
             case YoloTaskType::SEG: {
                 res.segmentations[i].track_id = track_id;
-                res.segmentations[i].track_points = __tracking_points[track_id];
+                res.segmentations[i].track_points = tracking_points_[track_id];
                 break;
             }
             case YoloTaskType::POSE: {
                 res.poses[i].track_id = track_id;
-                res.poses[i].track_points = __tracking_points[track_id];
+                res.poses[i].track_points = tracking_points_[track_id];
                 break;
             }
             default:
@@ -127,21 +125,21 @@ namespace yolo {
         }
 
         // check miss times & clear garbage data
-        for (auto i = __tracking_miss_times.begin(); i != __tracking_miss_times.end();) {
+        for (auto i = tracking_miss_times_.begin(); i != tracking_miss_times_.end();) {
             // not got hit, increase by 1
             if (i->second) {
                 i->second++;
             }
 
-            if (i->second > __cfg.max_miss) {
-                __tracking_points.erase(i->first);
-                i = __tracking_miss_times.erase(i);
+            if (i->second > cfg_.max_miss) {
+                tracking_points_.erase(i->first);
+                i = tracking_miss_times_.erase(i);
             }
             else {
                 i++;
             }
 
-            //assert(__tracking_miss_times.size() == __tracking_points.size()); 
+            //assert(tracking_miss_times_.size() == tracking_points_.size()); 
         }
     }
 
@@ -167,18 +165,23 @@ namespace yolo {
         postprocess(boxes, embeddings, track_ids, res);
     }
 
-    YoloResult YoloTracker::track_copy(const YoloResult& res) {
-        auto copy = res;
-        track(copy);
+    auto
+    YoloTracker::trackCopy(const YoloResult& res) -> YoloResult
+    {
+      auto copy = res;
+      track(copy);
 
-        return copy;
+      return copy;
     }
 
     void YoloTracker::operator()(YoloResult& res) {
         track(res);
     }
 
-    std::string YoloTracker::info(bool print) {
-        return "";
+    auto
+    YoloTracker::info(bool print) -> std::string
+    {
+      return "";
     }
+
 }

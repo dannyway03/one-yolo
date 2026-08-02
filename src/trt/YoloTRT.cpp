@@ -1,5 +1,8 @@
-#include <fstream>
 #include "trt/YoloTRT.h"
+
+#include <cstddef>
+
+#include <fstream>
 
 /**
  * tested for:
@@ -11,7 +14,7 @@ namespace yolo {
             if (severity <= Severity::kWARNING)
                 std::cout << "[TensorRT] " << msg << std::endl;
         }
-    } gLogger;
+    } g_logger;
 
     YoloTRT::YoloTRT(const std::string& model_path):
         YoloRuntime("TensorRT") {
@@ -26,48 +29,50 @@ namespace yolo {
         file.close();
 
         // create runtime / engine / context
-        __runtime = nvinfer1::createInferRuntime(gLogger);
-        __engine = __runtime->deserializeCudaEngine(engine_data.data(), size);
-        __context = __engine->createExecutionContext();
+        runtime_ = nvinfer1::createInferRuntime(gLogger);
+        engine_ = runtime_->deserializeCudaEngine(engine_data.data(), size);
+        context_ = engine_->createExecutionContext();
 
         allocate_buffers();
     }
     
     YoloTRT::~YoloTRT() {
-        for (void* buf : __device_buffers)
+        for (void* buf : device_buffers_)
             cudaFree(buf);
 
-        if (__context) __context->destroy();
-        if (__engine) __engine->destroy();
-        if (__runtime) __runtime->destroy();
+        if (context_) context_->destroy();
+        if (engine_) engine_->destroy();
+        if (runtime_) runtime_->destroy();
     }
 
     void YoloTRT::allocate_buffers() {
-        int nbBindings = __engine->getNbBindings();
-        __device_buffers.resize(nbBindings);
+      int nb_bindings = engine_->getNbBindings();
+      device_buffers_.resize(nbBindings);
 
-        for (int i = 0; i < nbBindings; ++i) {
-            auto dims = __engine->getBindingDimensions(i);
-            size_t vol = 1;
+      for (int i = 0; i < nb_bindings; ++i)
+      {
+        auto dims = engine_->getBindingDimensions(i);
+        size_t vol = 1;
 
-            for (int d = 0; d < dims.nbDims; ++d)
-                vol *= dims.d[d];
+        for (int d = 0; d < dims.nbDims; ++d)
+          vol *= dims.d[d];
 
-            size_t bytes = vol * sizeof(float);
+        size_t bytes = vol * sizeof(float);
 
-            cudaMalloc(&__device_buffers[i], bytes);
+        cudaMalloc(&device_buffers_[i], bytes);
 
-            if (!__engine->bindingIsInput(i)) {
-                std::vector<int64_t> shape;
-                for (int d = 0; d < dims.nbDims; ++d)
-                    shape.push_back(dims.d[d]);
+        if (!engine_->bindingIsInput(i))
+        {
+          std::vector<int64_t> shape;
+          for (int d = 0; d < dims.nbDims; ++d)
+            shape.push_back(dims.d[d]);
 
-                __output_shapes.push_back(shape);
-            }
+          output_shapes_.push_back(shape);
         }
+      }
     }
 
-    std::vector<cv::Mat> YoloTRT::inference(const cv::Mat& blob) {
+    auto YoloTRT::inference(const cv::Mat& blob) -> std::vector<cv::Mat> {
         // [batch, 3, input_h, input_w] or [batch, input_h, input_w, 3]
         assert(blob.isContinuous());
         assert(blob.type() == CV_32F);
@@ -78,28 +83,27 @@ namespace yolo {
         int d2 = blob.size[2];
         int d3 = blob.size[3];
 
-        size_t input_bytes =
-            d0 * d1 * d2 * d3 * sizeof(float);
+        size_t input_bytes = static_cast<size_t>(d0) * d1 * d2 * d3 * sizeof(float);
         cudaMemcpy(
-            __device_buffers[0],
+            device_buffers_[0],
             blob.data,
             input_bytes,
             cudaMemcpyHostToDevice
         );
 
-        __context->enqueueV2(
-            __device_buffers.data(),
+        context_->enqueueV2(
+            device_buffers_.data(),
             0,      // stream
             nullptr
         );
 
         std::vector<cv::Mat> outputs;
         int output_index = 0;
-        for (int i = 0; i < __engine->getNbBindings(); ++i) {
-            if (__engine->bindingIsInput(i))
+        for (int i = 0; i < engine_->getNbBindings(); ++i) {
+            if (engine_->bindingIsInput(i))
                 continue;
 
-            auto dims = __engine->getBindingDimensions(i);
+            auto dims = engine_->getBindingDimensions(i);
 
             size_t vol = 1;
             for (int d = 0; d < dims.nbDims; ++d)
@@ -109,7 +113,7 @@ namespace yolo {
 
             cudaMemcpy(
                 host_buffer.data(),
-                __device_buffers[i],
+                device_buffers_[i],
                 vol * sizeof(float),
                 cudaMemcpyDeviceToHost
             );

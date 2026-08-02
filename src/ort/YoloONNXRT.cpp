@@ -10,33 +10,33 @@ namespace yolo {
         bool use_cuda):
         YoloRuntime("ONNXRuntime") {
         // options
-        __session_options.SetIntraOpNumThreads(1);
-        __session_options.SetGraphOptimizationLevel(
+        session_options_.SetIntraOpNumThreads(1);
+        session_options_.SetGraphOptimizationLevel(
             GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
 
         if (use_cuda) {
             OrtCUDAProviderOptions cuda_options;
             cuda_options.device_id = 0;
 
-            __session_options.AppendExecutionProvider_CUDA(cuda_options);
+            session_options_.AppendExecutionProvider_CUDA(cuda_options);
         }
         
-        __session = Ort::Session(__env, model_path.c_str(), __session_options);
-    }
-    
-    YoloONNXRT::~YoloONNXRT() {
-
+        session_ = Ort::Session(env_, model_path.c_str(), session_options_);
     }
 
-    std::vector<cv::Mat> YoloONNXRT::inference(const cv::Mat& blob) {
-        std::vector<cv::Mat> outputs;
+    YoloONNXRT::~YoloONNXRT() = default;
 
-        // refer to cv::dnn::Net::forward
-        ort_forward(blob, outputs);
-        return outputs;
+    auto
+    YoloONNXRT::inference(const cv::Mat& blob) -> std::vector<cv::Mat>
+    {
+      std::vector<cv::Mat> outputs;
+
+      // refer to cv::dnn::Net::forward
+      ortForward(blob, outputs);
+      return outputs;
     }
 
-    void YoloONNXRT::ort_forward(
+    void YoloONNXRT::ortForward(
         const cv::Mat& input_4d,
         std::vector<cv::Mat>& outputs
     ) {
@@ -66,20 +66,22 @@ namespace yolo {
                 input_shape.size());
 
         //  get input / output num & names
-        auto input_names_str = __session.GetInputNames();
-        auto output_names_str = __session.GetOutputNames();
+        auto input_names_str = session_.GetInputNames();
+        auto output_names_str = session_.GetOutputNames();
         auto num_inputs  = input_names_str.size();   // 1 for Yolo
         auto num_outputs = output_names_str.size();
         std::vector<const char*> input_names;
         std::vector<const char*> output_names;
 
+        input_names.reserve(input_names_str.size());
         for (auto& s : input_names_str)
-            input_names.push_back(s.c_str());
+          input_names.push_back(s.c_str());
+        output_names.reserve(output_names_str.size());
         for (auto& s : output_names_str)
-            output_names.push_back(s.c_str());
+          output_names.push_back(s.c_str());
 
         // run with input tensor and get output tensors
-        auto output_tensors = __session.Run(
+        auto output_tensors = session_.Run(
             Ort::RunOptions{nullptr},
             input_names.data(),
             &input_tensor,
@@ -101,7 +103,7 @@ namespace yolo {
             for (int d = 0; d < dims; ++d)
                 cv_sizes[d] = static_cast<int>(shape[d]);
 
-            float* data_ptr = out_tensor.GetTensorMutableData<float>();
+            auto* data_ptr = out_tensor.GetTensorMutableData<float>();
             cv::Mat out_mat(
                 dims,
                 cv_sizes.data(),

@@ -15,11 +15,11 @@ namespace yolo {
     */
     class YoloTracker final {
     private:
-        YoloTrackConfig __cfg;
-        std::shared_ptr<BaseTrackAlgo> __tracker = nullptr;
+        YoloTrackConfig cfg_;
+        std::shared_ptr<BaseTrackAlgo> tracker_ = nullptr;
         // track_id -> track points
-        std::map<int, std::vector<cv::Point>> __tracking_points;
-        std::map<int, int>                    __tracking_miss_times;
+        std::map<int, std::vector<cv::Point>> tracking_points_;
+        std::map<int, int>                    tracking_miss_times_;
         void preprocess(
             const YoloResult& res, 
             std::vector<cv::Rect>& boxes, 
@@ -62,7 +62,8 @@ namespace yolo {
          * @return
          * new `YoloResult` instance as same as input with tracked data(such as track_id, track points).
         */
-        YoloResult track_copy(const YoloResult& res);
+        auto
+        trackCopy(const YoloResult& res) -> YoloResult;
 
         /**
          * @brief
@@ -79,6 +80,7 @@ namespace yolo {
          * @param print print summary to console or not.
          * @return summary for `YoloTracker`.
         */
-        std::string info(bool print = true);
+        auto
+        info(bool print = true) -> std::string;
     };
 }

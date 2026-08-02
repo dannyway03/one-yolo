@@ -1,24 +1,22 @@
 #include "track/sort/SortTrackAlgo.h"
 
 namespace yolo {
-    
-    SortTrackAlgo::SortTrackAlgo(const YoloTrackConfig& cfg): BaseTrackAlgo(cfg) {
 
-    }
-    
-    SortTrackAlgo::~SortTrackAlgo() {
+SortTrackAlgo::SortTrackAlgo(const YoloTrackConfig& cfg) : BaseTrackAlgo(cfg) {}
 
-    }
+SortTrackAlgo::~SortTrackAlgo() = default;
 
-    double SortTrackAlgo::getIOU(cv::Rect_<float> bb_test, cv::Rect_<float> bb_gt) {
-        float in = (bb_test & bb_gt).area();
-        float un = bb_test.area() + bb_gt.area() - in;
+auto
+SortTrackAlgo::getIOU(cv::Rect_<float> bb_test, cv::Rect_<float> bb_gt) -> double
+{
+  float in = (bb_test & bb_gt).area();
+  float un = bb_test.area() + bb_gt.area() - in;
 
-        if (un < DBL_EPSILON)
-            return 0;
+  if (un < DBL_EPSILON)
+    return 0;
 
-        return (double)(in / un);
-    }
+  return (double)(in / un);
+}
 
     void SortTrackAlgo::run(
         const std::vector<cv::Rect>& boxes, 
@@ -32,148 +30,143 @@ namespace yolo {
 		}
 
         // first time to initialize KalmanTracker
-        if (trackers.empty()) {
-            for (unsigned int i = 0; i < boxes.size(); i++) {
-				auto trk = KalmanTracker(
-                    cv::Rect_<float>(
-                        boxes[i].x, 
-                        boxes[i].y, 
-                        boxes[i].width, 
-                        boxes[i].height));
-				trackers.emplace_back(trk);
-			}
+        if (trackers_.empty()) {
+          for (auto boxe : boxes)
+          {
+            auto trk = KalmanTracker(cv::Rect_<float>(boxe.x, boxe.y, boxe.width, boxe.height));
+            trackers_.emplace_back(trk);
+          }
             return;
         }
 
-        //3.1. get predicted locations from existing trackers.
-        predictedBoxes.clear();
-		for (auto it = trackers.begin(); it != trackers.end();) {
-			auto pBox = (*it).predict();
-			if (pBox.x >= 0 && pBox.y >= 0) {
-				predictedBoxes.emplace_back(pBox);
-				it++;
-			}
-			else {
-				it = trackers.erase(it);
+        //3.1. get predicted locations from existing trackers_.
+        predicted_boxes_.clear();
+		for (auto it = trackers_.begin(); it != trackers_.end();) {
+                  auto p_box = (*it).predict();
+                  if (p_box.x >= 0 && p_box.y >= 0)
+                  {
+                    predicted_boxes_.emplace_back(p_box);
+                    it++;
+                  }
+                        else {
+				it = trackers_.erase(it);
 			}
 		}
         
         // 3.2. associate detections to tracked object (both represented as bounding boxes)
 		// dets : detFrameData[fi]
-		auto trkNum = predictedBoxes.size();
-		auto detNum = boxes.size();
+                auto trk_num = predicted_boxes_.size();
+                auto det_num = boxes.size();
 
-		iouMatrix.clear();
-		iouMatrix.resize(trkNum, vector<double>(detNum, 0));
-        
-		// compute iou matrix as a distance matrix
-        for (unsigned int i = 0; i < trkNum; i++)  {
-			for (unsigned int j = 0; j < detNum; j++) {
-				// use 1-iou because the hungarian algorithm computes a minimum-cost assignment.
-				iouMatrix[i][j] = 1 - getIOU(
-                    predictedBoxes[i], 
-                    cv::Rect_<float>(
-                        boxes[j].x, 
-                        boxes[j].y, 
-                        boxes[j].width, 
-                        boxes[j].height));
-			}
-		}
+                iou_matrix_.clear();
+                iou_matrix_.resize(trk_num, vector<double>(det_num, 0));
 
-        // solve the assignment problem using hungarian algorithm.
-		// the resulting assignment is [track(prediction) : detection], with len=preNum
-		HungarianAlgorithm HungAlgo;
-		assignment.clear();
-		HungAlgo.Solve(iouMatrix, assignment);
+                // compute iou matrix as a distance matrix
+                for (unsigned int i = 0; i < trk_num; i++)
+                {
+                  for (unsigned int j = 0; j < det_num; j++)
+                  {
+                    // use 1-iou because the hungarian algorithm computes a minimum-cost assignment_.
+                    iou_matrix_[i][j] = 1 - getIOU(predicted_boxes_[i], cv::Rect_<float>(boxes[j].x, boxes[j].y,
+                                                                                     boxes[j].width, boxes[j].height));
+                  }
+                }
 
-		// find matches, unmatched_detections and unmatched_predictions
-		unmatchedTrajectories.clear();
-		unmatchedDetections.clear();
-		allItems.clear();
-		matchedItems.clear();
+        // solve the assignment_ problem using hungarian algorithm.
+		// the resulting assignment_ is [track(prediction) : detection], with len=preNum
+                HungarianAlgorithm hung_algo;
+                assignment_.clear();
+                hung_algo.Solve(iou_matrix_, assignment_);
+
+                // find matches, unmatched_detections and unmatched_predictions
+		unmatched_trajectories_.clear();
+		unmatched_detections_.clear();
+		all_items_.clear();
+		matched_items_.clear();
 
 		// there are unmatched detections
-        if (detNum > trkNum) {
-			for (unsigned int n = 0; n < detNum; n++)
-				allItems.insert(n);
+                if (det_num > trk_num)
+                {
+                  for (unsigned int n = 0; n < det_num; n++)
+                    all_items_.insert(n);
 
-			for (unsigned int i = 0; i < trkNum; ++i)
-				matchedItems.insert(assignment[i]);
+                  for (unsigned int i = 0; i < trk_num; ++i)
+                    matched_items_.insert(assignment_[i]);
 
-			set_difference(allItems.begin(), allItems.end(),
-				matchedItems.begin(), matchedItems.end(),
-				insert_iterator<set<int>>(unmatchedDetections, unmatchedDetections.begin()));
-		}
-		// there are unmatched trajectory/predictions
-		else if (detNum < trkNum) {
-			for (unsigned int i = 0; i < trkNum; ++i)
-				if (assignment[i] == -1) // unassigned label will be set as -1 in the assignment algorithm
-					unmatchedTrajectories.insert(i);
-		}
-		else {
+                  set_difference(all_items_.begin(), all_items_.end(), matched_items_.begin(), matched_items_.end(),
+                                 insert_iterator<set<int>>(unmatched_detections_, unmatched_detections_.begin()));
+                }
+                // there are unmatched trajectory/predictions
+                else if (det_num < trk_num)
+                {
+                  for (unsigned int i = 0; i < trk_num; ++i)
+                    if (assignment_[i] == -1) // unassigned label will be set as -1 in the assignment_ algorithm
+                      unmatched_trajectories_.insert(i);
+                }
+                else {
 
 		}
         
         // filter out matched with low IOU
-		matchedPairs.clear();
-		for (unsigned int i = 0; i < trkNum; ++i) {
-			if (assignment[i] == -1) // pass over invalid values
-				continue;
-			if (1 - iouMatrix[i][assignment[i]] < _cfg.iou_thresh) {
-				unmatchedTrajectories.insert(i);
-				unmatchedDetections.insert(assignment[i]);
-			}
-			else {
-				matchedPairs.emplace_back(cv::Point(i, assignment[i]));
-			}
-		}
+		matched_pairs_.clear();
+                for (unsigned int i = 0; i < trk_num; ++i)
+                {
+                  if (assignment_[i] == -1) // pass over invalid values
+                    continue;
+                  if (1 - iou_matrix_[i][assignment_[i]] < _cfg.iou_thresh)
+                  {
+                    unmatched_trajectories_.insert(i);
+                    unmatched_detections_.insert(assignment_[i]);
+                  }
+                  else
+                  {
+                    matched_pairs_.emplace_back(i, assignment_[i]);
+                  }
+                }
 
-        // 3.3. updating trackers
-		// update matched trackers with assigned detections.
-		// each prediction is corresponding to a tracker
-		int detIdx, trkIdx;
-		for (unsigned int i = 0; i < matchedPairs.size(); i++) {
-			trkIdx = matchedPairs[i].x;
-			detIdx = matchedPairs[i].y;
-			trackers[trkIdx].update(
-                cv::Rect_<float>(
-                    boxes[detIdx].x, 
-                    boxes[detIdx].y, 
-                    boxes[detIdx].width, 
-                    boxes[detIdx].height));
-		}
+        // 3.3. updating trackers_
+		// update matched trackers_ with assigned detections.
+		// each prediction is corresponding to a tracker_
+                int det_idx, trk_idx;
+                for (auto& matchedPair : matched_pairs_)
+                {
+                  trk_idx = matchedPair.x;
+                  det_idx = matchedPair.y;
+                  trackers_[trk_idx].update(
+                    cv::Rect_<float>(boxes[det_idx].x, boxes[det_idx].y, boxes[det_idx].width, boxes[det_idx].height));
+                }
 
-		// create and initialise new trackers for unmatched detections
-		for (auto& umd : unmatchedDetections) {
-			auto tracker = KalmanTracker(
+                // create and initialise new trackers_ for unmatched detections
+		for (auto& umd : unmatched_detections_) {
+			auto tracker_ = KalmanTracker(
                 cv::Rect_<float>(
                     boxes[umd].x, 
                     boxes[umd].y,
                     boxes[umd].width, 
                     boxes[umd].height));
-			trackers.emplace_back(tracker);
+			trackers_.emplace_back(tracker_);
 		}
 
-        // get trackers' output
-		frameTrackingResult.clear();
-		for (auto it = trackers.begin(); it != trackers.end();) {
+        // get trackers_' output
+		frame_tracking_result_.clear();
+		for (auto it = trackers_.begin(); it != trackers_.end();) {
 			if (((*it).m_time_since_update < 1) &&
 				((*it).m_hit_streak >= _cfg.min_hits)) {
 				TrackingBox res;
-				res.box = (*it).get_state();
-				res.id = (*it).m_id + 1;
-				frameTrackingResult.emplace_back(res);
+				res.box_ = (*it).get_state();
+				res.id_ = (*it).m_id + 1;
+				frame_tracking_result_.emplace_back(res);
 				it++;
 			}
 			else
 				it++;
 
-			// remove dead tracker
-			if (it != trackers.end() && (*it).m_time_since_update > _cfg.max_miss)
-				it = trackers.erase(it);
+			// remove dead tracker_
+			if (it != trackers_.end() && (*it).m_time_since_update > _cfg.max_miss)
+				it = trackers_.erase(it);
 		}
 
-        for (const auto& tb : frameTrackingResult) {
+        for (const auto& tb : frame_tracking_result_) {
 			// id and box need to correspond
 			for (int i = 0; i < boxes.size(); ++i) {
 				if(getIOU(
@@ -183,14 +176,14 @@ namespace yolo {
                         boxes[i].width, 
                         boxes[i].height),
 					cv::Rect_<float>(
-                        tb.box.x, 
-                        tb.box.y, 
-                        tb.box.width, 
-                        tb.box.height)) > 0.8) {
-				    track_ids[i] = tb.id;
+                        tb.box_.x, 
+                        tb.box_.y, 
+                        tb.box_.width, 
+                        tb.box_.height)) > 0.8) {
+				    track_ids[i] = tb.id_;
 				}
 			}
         }
-        return;
     }
+
 }

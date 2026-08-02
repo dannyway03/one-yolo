@@ -17,40 +17,40 @@
 namespace yolo {
         
     YoloTask::YoloTask(const YoloConfig& cfg): _cfg(cfg) {
-        switch (_cfg.target_rt) {
+        switch (_cfg.target_rt_) {
         case YoloTargetRT::OPENCV_CPU:
-            _rt = std::make_shared<yolo::YoloOpenCVRT>(_cfg.model_path, false);
+            _rt = std::make_shared<yolo::YoloOpenCVRT>(_cfg.model_path_, false);
             break;
         case YoloTargetRT::OPENCV_CUDA:
-            _rt = std::make_shared<yolo::YoloOpenCVRT>(_cfg.model_path, true);
+            _rt = std::make_shared<yolo::YoloOpenCVRT>(_cfg.model_path_, true);
             break;
         #ifdef BUILD_WITH_ORT
         case YoloTargetRT::ORT_CPU:
-            _rt = std::make_shared<yolo::YoloONNXRT>(_cfg.model_path, false);
+            _rt = std::make_shared<yolo::YoloONNXRT>(_cfg.model_path_, false);
             break;
         case YoloTargetRT::ORT_CUDA:
-            _rt = std::make_shared<yolo::YoloONNXRT>(_cfg.model_path, true);
+            _rt = std::make_shared<yolo::YoloONNXRT>(_cfg.model_path_, true);
             break;
         #endif
         #ifdef BUILD_WITH_OVN
         case YoloTargetRT::OVN_AUTO:
-            _rt = std::make_shared<yolo::YoloOVNRT>(_cfg.model_path, "AUTO");
+            _rt = std::make_shared<yolo::YoloOVNRT>(_cfg.model_path_, "AUTO");
             break;
         case YoloTargetRT::OVN_CPU:
-            _rt = std::make_shared<yolo::YoloOVNRT>(_cfg.model_path, "CPU");
+            _rt = std::make_shared<yolo::YoloOVNRT>(_cfg.model_path_, "CPU");
             break;
         case YoloTargetRT::OVN_GPU:
-            _rt = std::make_shared<yolo::YoloOVNRT>(_cfg.model_path, "GPU");
+            _rt = std::make_shared<yolo::YoloOVNRT>(_cfg.model_path_, "GPU");
             break;
         #endif
         #ifdef BUILD_WITH_TRT
         case YoloTargetRT::TRT:
-            _rt = std::make_shared<yolo::YoloTRT>(_cfg.model_path);
+            _rt = std::make_shared<yolo::YoloTRT>(_cfg.model_path_);
             break;
         #endif
         #ifdef BUILD_WITH_RKN
         case YoloTargetRT::RKNN:
-            _rt = std::make_shared<yolo::YoloRKNNRT>(_cfg.model_path);
+            _rt = std::make_shared<yolo::YoloRKNNRT>(_cfg.model_path_);
             break;
         #endif
         default:
@@ -67,14 +67,14 @@ namespace yolo {
         assert(!image.empty());
 
         // different for classification task
-        if (_cfg.task == YoloTaskType::CLS) {
+        if (_cfg.task_ == YoloTaskType::CLS) {
             cv::Mat resized;
-            cv::resize(image, resized, cv::Size(_cfg.input_w, _cfg.input_h));
+            cv::resize(image, resized, cv::Size(_cfg.input_w_, _cfg.input_h_));
             _orig_sizes.push_back(image.size());
             _letterbox_infos.push_back(LetterBoxInfo{1.0f, 0, 0});
             _input_images.push_back(resized);
 
-            // [3, _cfg.input_h, _cfg.input_w]
+            // [3, _cfg.input_h_, _cfg.input_w_]
             return resized;
         }
         
@@ -82,14 +82,14 @@ namespace yolo {
         YoloUtils utils;
         cv::Mat lb = utils.letterbox(
             image,
-            _cfg.input_w,
-            _cfg.input_h,
+            _cfg.input_w_,
+            _cfg.input_h_,
             info
         );
         _orig_sizes.push_back(image.size());
         _letterbox_infos.push_back(info);
         _input_images.push_back(lb);
-        // [3, _cfg.input_h, _cfg.input_w]
+        // [3, _cfg.input_h_, _cfg.input_w_]
         return lb;
     }
 
@@ -103,22 +103,22 @@ namespace yolo {
             letterboxes.push_back(preprocess_one(image));
         }
 
-        // [batch, 3, _cfg.input_h, _cfg.input_w]
+        // [batch, 3, _cfg.input_h_, _cfg.input_w_]
         cv::Mat blob;
         cv::dnn::blobFromImages(
             letterboxes,
             blob,
-            _cfg.scale_f,
+            _cfg.scale_f_,
             cv::Size(),
             cv::Scalar(),
-            _cfg.rgb,
+            _cfg.rgb_,
             false
         );
 
         // different for classification task
-        if (_cfg.task == YoloTaskType::CLS
-            && _cfg.mean.size() == 3 
-            && _cfg.std.size() == 3) {
+        if (_cfg.task_ == YoloTaskType::CLS
+            && _cfg.mean_.size() == 3 
+            && _cfg.std_.size() == 3) {
             int N = blob.size[0];
             int C = blob.size[1];
             int H = blob.size[2];
@@ -127,8 +127,8 @@ namespace yolo {
             for (int n = 0; n < N; ++n) {
                 for (int c = 0; c < C; ++c) {
                     float* ptr = blob.ptr<float>(n, c);
-                    float m = _cfg.mean[c];
-                    float s = _cfg.std[c];
+                    float m = _cfg.mean_[c];
+                    float s = _cfg.std_[c];
 
                     int spatial = H * W;
                     for (int i = 0; i < spatial; ++i) {
@@ -139,13 +139,13 @@ namespace yolo {
         }
         
         // NHWC as input
-        if (!_cfg.nchw) {
+        if (!_cfg.nchw_) {
             cv::Mat blob_nhwc;
             std::vector<int> order = {0, 2, 3, 1};  
             // NCHW -> NHWC
             cv::transposeND(blob, order, blob_nhwc);
 
-            // [batch, _cfg.input_h, _cfg.input_w, 3]
+            // [batch, _cfg.input_h_, _cfg.input_w_, 3]
             return blob_nhwc;
         }
 
@@ -190,13 +190,13 @@ namespace yolo {
             r.speed.push_back(std::chrono::duration_cast<std::chrono::microseconds>(t4-t3).count() / 1000.0);  // postprocess time(ms)
 
             r.id             = i;                      // batch id
-            r.names          = _cfg.names;
-            r.batch_size     = _cfg.batch_size;
-            r.task           = _cfg.task;
-            r.version        = _cfg.version;
-            r.target_rt      = _cfg.target_rt;
-            r.input_w        = _cfg.input_w;
-            r.input_h        = _cfg.input_h;
+            r.names          = _cfg.names_;
+            r.batch_size     = _cfg.batch_size_;
+            r.task           = _cfg.task_;
+            r.version        = _cfg.version_;
+            r.target_rt      = _cfg.target_rt_;
+            r.input_w        = _cfg.input_w_;
+            r.input_h        = _cfg.input_h_;
             r.letterbox_info = _letterbox_infos[i];
             r.input_image    = _input_images[i];
             r.orig_size      = _orig_sizes[i];

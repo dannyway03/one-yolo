@@ -5,10 +5,11 @@ namespace yolo {
     class YoloOpenCVRT: public YoloRuntime
     {
     private:
-        cv::dnn::Net __net;
+        cv::dnn::Net net_;
     public:
         YoloOpenCVRT(const std::string& model_path, bool use_cuda = true);
         ~YoloOpenCVRT();
-        virtual std::vector<cv::Mat> inference(const cv::Mat& blob) override;
+        auto
+        inference(const cv::Mat& blob) -> std::vector<cv::Mat> override;
     };
 }

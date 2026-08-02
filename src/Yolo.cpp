@@ -7,63 +7,74 @@
 #include "YoloObbTask.h"
 
 namespace yolo {
-    Yolo::Yolo(const YoloConfig& cfg): __cfg(cfg) {
-        if (__cfg.num_classes != __cfg.names.size()) {
+    Yolo::Yolo(const YoloConfig& cfg): cfg_(cfg) {
+        if (cfg_.num_classes_ != cfg_.names_.size()) {
             throw std::invalid_argument("num_classes != labels.size() in YoloConfig!");
         }
 
-        switch (__cfg.task) {
+        switch (cfg_.task_) {
         case YoloTaskType::CLS:
-            __task = std::make_shared<yolo::YoloClsTask>(cfg);
+            task_ = std::make_shared<yolo::YoloClsTask>(cfg);
             break;
         case YoloTaskType::DET:
-            __task = std::make_shared<yolo::YoloDetTask>(cfg);
+            task_ = std::make_shared<yolo::YoloDetTask>(cfg);
             break;
         case YoloTaskType::SEG:
-            __task = std::make_shared<yolo::YoloSegTask>(cfg);
+            task_ = std::make_shared<yolo::YoloSegTask>(cfg);
             break;
         case YoloTaskType::POSE:
-            __task = std::make_shared<yolo::YoloPoseTask>(cfg);
+            task_ = std::make_shared<yolo::YoloPoseTask>(cfg);
             break;
         case YoloTaskType::OBB:
-            __task = std::make_shared<yolo::YoloObbTask>(cfg);
+            task_ = std::make_shared<yolo::YoloObbTask>(cfg);
             break;
         default:
             throw std::invalid_argument("invalid YoloTaskType parameter when initializing Yolo!");
             break;
         }
     }
-    
-    Yolo::~Yolo() {
 
+    Yolo::~Yolo() = default;
+
+    auto
+    Yolo::predict(const cv::Mat& image) -> YoloResult
+    {
+      return predict(std::vector<cv::Mat>{image})[0];
     }
 
-    YoloResult Yolo::predict(const cv::Mat& image) {
-        return predict(std::vector<cv::Mat>{image})[0];
+    auto
+    Yolo::operator()(const cv::Mat& image) -> YoloResult
+    {
+      return (*this)(std::vector<cv::Mat>{image})[0];
     }
 
-    YoloResult Yolo::operator()(const cv::Mat& image) {
-        return (*this)(std::vector<cv::Mat>{image})[0];
+    auto
+    Yolo::predict(const std::vector<cv::Mat>& images) -> std::vector<YoloResult>
+    {
+      if (cfg_.batch_size_ && cfg_.batch_size_ != images.size())
+      {
+        throw std::runtime_error("got invalid batch size when calling Yolo::predict()!");
+      }
+
+      return (*task_)(images);
     }
 
-    std::vector<YoloResult> Yolo::predict(const std::vector<cv::Mat>& images) {
-        if (__cfg.batch_size && __cfg.batch_size != images.size()) {
-            throw std::runtime_error("got invalid batch size when calling Yolo::predict()!");
-        }
-        
-        return (*__task)(images);
+    auto
+    Yolo::operator()(const std::vector<cv::Mat>& images) -> std::vector<YoloResult>
+    {
+      return predict(images);
     }
 
-    std::vector<YoloResult> Yolo::operator()(const std::vector<cv::Mat>& images) {
-        return predict(images);
+    auto
+    Yolo::info(bool print) -> std::string
+    {
+      auto cfg_summary = toString(cfg_);
+
+      if (print)
+      {
+        std::cout << cfg_summary << '\n';
+      }
+      return cfg_summary;
     }
 
-    std::string Yolo::info(bool print) {
-        auto cfg_summary = to_string(__cfg);
-
-        if (print) {
-            std::cout << cfg_summary << std::endl;
-        }
-        return cfg_summary;
-    }
 }

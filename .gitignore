@@ -61,3 +61,15 @@ build/
 /test*.cpp
 /tool*.py
 /note.txt
+/.idea/copyright/profiles_settings.xml
+/.idea/inspectionProfiles/Project_Default.xml
+/.idea/.gitignore
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/one-yolo.iml
+/.idea/vcs.xml
+/.serena/.gitignore
+/.serena/project.yml
+/do not remove/bkp.zip
+/results/clang-tidy/clang-tidy.log
+/results/clang-tidy/fixes.yaml
