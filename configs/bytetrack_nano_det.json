@@ -1,0 +1,16 @@
+{
+  "model_path":  "../models/bytetrack_nano_mot17_1x3x384x640_decoded.xml",
+  "task":        "det",
+  "version":     "yolox",
+  "batch":       1,
+  "input_w":     640,
+  "input_h":     384,
+  "num_classes": 1,
+  "conf_thresh": 0.25,
+  "iou_thresh":  0.45,
+  "scale_f":     1.0,
+  "nchw":        true,
+  "rgb":         true,
+  "mean":        [],
+  "std":         []
+}
