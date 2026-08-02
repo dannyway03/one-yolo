@@ -2,12 +2,12 @@
 
 /**
  * tested for:
- * 1. OpenVINO==2024
+ * 1. OpenVINO==2026
 */
 namespace yolo {
     // docs.openvino.ai/2025/openvino-workflow/running-inference.html
     YoloOVNRT::YoloOVNRT(
-        const std::string& model_path, 
+        const std::string& model_path,
         const std::string& device):
         YoloRuntime("OpenVINO") {
         auto model = core_.read_model(model_path);
@@ -21,55 +21,103 @@ namespace yolo {
         config[ov::cache_dir.name()] = "/tmp/ov_cache";
 
         compiled_model_ = core_.compile_model(model, device, config);
-        infer_request_ = compiled_model_.create_infer_request();
+        // Only req[0] is created here. req[1] is created lazily on the first
+        // submit() call so that callers using only inference() pay no L3 penalty.
+        infer_req_[0] = compiled_model_.create_infer_request();
     }
 
     YoloOVNRT::~YoloOVNRT() = default;
 
-    auto
-    YoloOVNRT::inference(const cv::Mat& blob) -> std::vector<cv::Mat>
+    // ── blocking single-frame path ────────────────────────────────────────────
+
+    auto YoloOVNRT::inference(const cv::Mat& blob) -> std::vector<cv::Mat>
     {
-      // [batch, 3, input_h, input_w] or [batch, input_h, input_w, 3]
-      assert(blob.isContinuous());
-      assert(blob.type() == CV_32F);
-      assert(blob.dims == 4);
+        // Always uses infer_req_[0]. Do not mix with submit/collect in the same loop.
+        assert(blob.isContinuous());
+        assert(blob.type() == CV_32F);
+        assert(blob.dims == 4);
 
-      int d0 = blob.size[0];
-      int d1 = blob.size[1];
-      int d2 = blob.size[2];
-      int d3 = blob.size[3];
+        ov::Tensor input_tensor(
+            ov::element::f32,
+            {(size_t)blob.size[0], (size_t)blob.size[1],
+             (size_t)blob.size[2], (size_t)blob.size[3]},
+            const_cast<float*>(reinterpret_cast<const float*>(blob.data)));
 
-      // zero copy: wrap blob data directly into OV tensor (no allocation)
-      ov::Tensor input_tensor(ov::element::f32, {(size_t)d0, (size_t)d1, (size_t)d2, (size_t)d3},
-                              const_cast<float*>(reinterpret_cast<const float*>(blob.data)));
+        infer_req_[0].set_input_tensor(input_tensor);
+        infer_req_[0].start_async();
+        infer_req_[0].wait();
 
-      infer_request_.set_input_tensor(input_tensor);
-      // start_async + wait: device runs async, ready for double-buffer upgrade later.
-      // Caller must consume returned cv::Mat before the next inference() call —
-      // output data aliases infer_request_'s internal buffers (no copy).
-      infer_request_.start_async();
-      infer_request_.wait();
+        std::vector<cv::Mat> outputs;
+        const auto& output_ports = compiled_model_.outputs();
+        outputs.reserve(output_ports.size());
 
-      std::vector<cv::Mat> outputs;
-      const auto& output_ports = compiled_model_.outputs();
+        for (size_t i = 0; i < output_ports.size(); ++i)
+        {
+            ov::Tensor out_tensor = infer_req_[0].get_output_tensor(i);
+            const ov::Shape& shape = out_tensor.get_shape();
+            auto* out_data = out_tensor.data<float>();
 
-      for (size_t i = 0; i < output_ports.size(); ++i)
-      {
-        ov::Tensor out_tensor = infer_request_.get_output_tensor(i);
-        const ov::Shape& shape = out_tensor.get_shape();
+            int mat_dims = static_cast<int>(shape.size());
+            std::vector<int> mat_sizes(mat_dims);
+            for (int d = 0; d < mat_dims; ++d)
+                mat_sizes[d] = static_cast<int>(shape[d]);
 
-        auto* out_data = out_tensor.data<float>();
+            outputs.emplace_back(mat_dims, mat_sizes.data(), CV_32F, out_data);
+        }
 
-        int mat_dims = static_cast<int>(shape.size());
-        std::vector<int> mat_sizes(mat_dims);
-        for (int d = 0; d < mat_dims; ++d)
-          mat_sizes[d] = static_cast<int>(shape[d]);
+        return outputs;
+    }
 
-        // No clone: cv::Mat aliases infer_request_'s internal buffer directly.
-        outputs.emplace_back(mat_dims, mat_sizes.data(), CV_32F, out_data);
-      }
+    // ── pipeline API (GPU/NPU double-buffer) ──────────────────────────────────
 
-      return outputs;
+    void YoloOVNRT::submit(const cv::Mat& blob)
+    {
+        if (!pipeline_ready_)
+        {
+            infer_req_[1] = compiled_model_.create_infer_request();
+            pipeline_ready_ = true;
+        }
+
+        assert(blob.isContinuous());
+        assert(blob.type() == CV_32F);
+        assert(blob.dims == 4);
+
+        // Zero-copy: blob must stay valid and unmodified until the matching collect().
+        ov::Tensor input_tensor(
+            ov::element::f32,
+            {(size_t)blob.size[0], (size_t)blob.size[1],
+             (size_t)blob.size[2], (size_t)blob.size[3]},
+            const_cast<float*>(reinterpret_cast<const float*>(blob.data)));
+
+        infer_req_[submit_idx_].set_input_tensor(input_tensor);
+        infer_req_[submit_idx_].start_async();
+        submit_idx_ ^= 1;
+    }
+
+    auto YoloOVNRT::collect() -> std::vector<cv::Mat>
+    {
+        infer_req_[collect_idx_].wait();
+
+        std::vector<cv::Mat> outputs;
+        const auto& output_ports = compiled_model_.outputs();
+        outputs.reserve(output_ports.size());
+
+        for (size_t i = 0; i < output_ports.size(); ++i)
+        {
+            ov::Tensor out_tensor = infer_req_[collect_idx_].get_output_tensor(i);
+            const ov::Shape& shape = out_tensor.get_shape();
+            auto* out_data = out_tensor.data<float>();
+
+            int mat_dims = static_cast<int>(shape.size());
+            std::vector<int> mat_sizes(mat_dims);
+            for (int d = 0; d < mat_dims; ++d)
+                mat_sizes[d] = static_cast<int>(shape[d]);
+
+            outputs.emplace_back(mat_dims, mat_sizes.data(), CV_32F, out_data);
+        }
+
+        collect_idx_ ^= 1;
+        return outputs;
     }
 
 }
