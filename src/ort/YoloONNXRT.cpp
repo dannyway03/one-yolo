@@ -22,6 +22,17 @@ namespace yolo {
         }
         
         session_ = Ort::Session(env_, model_path.c_str(), session_options_);
+
+        memory_info_ = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+
+        input_names_str_  = session_.GetInputNames();
+        output_names_str_ = session_.GetOutputNames();
+        input_names_.reserve(input_names_str_.size());
+        for (const auto& s : input_names_str_)
+            input_names_.push_back(s.c_str());
+        output_names_.reserve(output_names_str_.size());
+        for (const auto& s : output_names_str_)
+            output_names_.push_back(s.c_str());
     }
 
     YoloONNXRT::~YoloONNXRT() = default;
@@ -53,46 +64,26 @@ namespace yolo {
         auto input_tensor_size = input_4d.total();
 
         // cv::Mat → ORT Tensor (zero copy)
-        Ort::MemoryInfo memory_info =
-            Ort::MemoryInfo::CreateCpu(
-                OrtArenaAllocator,
-                OrtMemTypeDefault);
         Ort::Value input_tensor =
             Ort::Value::CreateTensor<float>(
-                memory_info,
+                memory_info_,
                 (float*)input_4d.data,
                 input_tensor_size,
                 input_shape.data(),
                 input_shape.size());
 
-        //  get input / output num & names
-        auto input_names_str = session_.GetInputNames();
-        auto output_names_str = session_.GetOutputNames();
-        auto num_inputs  = input_names_str.size();   // 1 for Yolo
-        auto num_outputs = output_names_str.size();
-        std::vector<const char*> input_names;
-        std::vector<const char*> output_names;
-
-        input_names.reserve(input_names_str.size());
-        for (auto& s : input_names_str)
-          input_names.push_back(s.c_str());
-        output_names.reserve(output_names_str.size());
-        for (auto& s : output_names_str)
-          output_names.push_back(s.c_str());
-
-        // run with input tensor and get output tensors
         auto output_tensors = session_.Run(
             Ort::RunOptions{nullptr},
-            input_names.data(),
+            input_names_.data(),
             &input_tensor,
-            1,
-            output_names.data(),
-            num_outputs);
+            input_names_.size(),
+            output_names_.data(),
+            output_names_.size());
 
         // ORT Tensor → cv::Mat (should copy buffer data)
         outputs.clear();
-        outputs.reserve(num_outputs);
-        for (size_t i = 0; i < num_outputs; ++i) {
+        outputs.reserve(output_names_.size());
+        for (size_t i = 0; i < output_names_.size(); ++i) {
             auto& out_tensor = output_tensors[i];
 
             auto shape_info = out_tensor.GetTensorTypeAndShapeInfo();

@@ -13,6 +13,13 @@ namespace yolo {
         Ort::Env env_;
         Ort::Session session_ {nullptr};
         Ort::SessionOptions session_options_;
+        Ort::MemoryInfo memory_info_ {nullptr};
+
+        std::vector<std::string> input_names_str_;
+        std::vector<std::string> output_names_str_;
+        std::vector<const char*> input_names_;
+        std::vector<const char*> output_names_;
+
         void
         ortForward(const cv::Mat& input_4d, std::vector<cv::Mat>& outputs);
 
