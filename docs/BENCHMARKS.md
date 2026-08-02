@@ -15,7 +15,7 @@ for every supported detector/backend combination.
 
 ## Executive Snapshot — 2026-08-02
 
-Best results to date: **2026-08-02e** (FP32 IR + down/yolo26n).  
+Best results to date: **2026-08-02f** (pipeline bench, `submit/collect` double-buffer, GPU FP32).  
 OVN timing baseline: commit **1f48441** · PXL image (CPU FP16).  
 ORT timing baseline: commit **5416363** · MOT17-02 frame 1.  
 Accuracy baseline: MOT17-02 frame 1 · 22 GT pedestrians.  
@@ -23,7 +23,7 @@ Platform: Intel i7-8665U · Intel UHD 620 (iGPU) · NVIDIA MX250.
 
 ### Timing — best results (avg · 50 iter · 640 × 384 · MOT17-02/000001.jpg)
 
-#### OVN CPU
+#### OVN CPU — sequential (inference() path)
 
 | Model | Precision | infer | **total** | **FPS** | Det |
 |---|---|---:|---:|---:|---|
@@ -36,7 +36,7 @@ Platform: Intel i7-8665U · Intel UHD 620 (iGPU) · NVIDIA MX250.
 | bytetrack\_nano\_dec | FP16 | 14.67 ms | **18.29 ms** | **54.7** | 12 |
 | bytetrack\_nano\_dec | FP32 | 14.47 ms | **18.44 ms** | **54.2** | 12 |
 
-#### OVN GPU — Intel UHD 620
+#### OVN GPU — Intel UHD 620 — sequential (inference() path)
 
 | Model | Precision | infer | **total** | **FPS** | Det |
 |---|---|---:|---:|---:|---|
@@ -49,7 +49,22 @@ Platform: Intel i7-8665U · Intel UHD 620 (iGPU) · NVIDIA MX250.
 | bytetrack\_nano\_dec | FP16 | 11.60 ms | **15.11 ms** | **66.2** | 12 |
 | **bytetrack\_nano\_dec** | **FP32** | **10.15 ms** | **12.58 ms** | **79.5** ★ | 12 |
 
-★ = best result for this model to date
+★ = best sequential result for this model to date
+
+#### OVN GPU — Intel UHD 620 — pipeline (submit/collect double-buffer) · `media/test_frame.jpg` ¹
+
+| Model | Precision | pre | gpu\_wait | post | **total/iter** | **FPS** |
+|---|---|---:|---:|---:|---:|---:|
+| yolo26n (static) | FP32 | 5.24 ms | 20.99 ms | 0.11 ms | **26.34 ms** | **38.0** |
+| yolo26n (static) | FP16 | 5.28 ms | 21.26 ms | 0.11 ms | **26.65 ms** | **37.5** |
+| yolox\_nano\_dec | FP32 | 5.17 ms | 9.01 ms | 1.04 ms | **15.22 ms** | **65.7** |
+| yolox\_nano\_dec | FP16 | 5.23 ms | 9.01 ms | 1.06 ms | **15.30 ms** | **65.4** |
+| **bytetrack\_nano\_dec** | **FP32** | **5.68 ms** | **7.42 ms** | **0.79 ms** | **13.89 ms** | **72.0** ★★ |
+| bytetrack\_nano\_dec | FP16 | 5.19 ms | 7.60 ms | 0.80 ms | **13.59 ms** | **73.6** |
+
+★★ = best pipeline result · `gpu_wait > 0` for all models → GPU is the throughput bottleneck on UHD 620.  
+¹ Pipeline timings use `media/test_frame.jpg`; not directly comparable to MOT17 sequential numbers above.  
+`total/iter ≈ GPU infer time` — preprocessing (pre) runs hidden behind the previous frame's GPU work.
 
 #### ORT CPU
 
@@ -220,7 +235,190 @@ awk -F',' '$1==1 && $7==1 && $8==1 {count++} END{print count}' \
 
 ---
 
+## System Architecture & Dataflow
+
+### Class Hierarchy
+
+```mermaid
+classDiagram
+    class Yolo {
+        +predict(image) YoloResult
+        +predict(images) YoloResult[]
+        +task() shared_ptr~YoloTask~
+    }
+    class YoloTask {
+        +preprocess(images) Mat
+        +postprocess(raw, batch) YoloResult[]
+        +runtime() shared_ptr~YoloRuntime~
+        #_rt shared_ptr~YoloRuntime~
+        #_cfg YoloConfig
+    }
+    class YoloRuntime {
+        <<interface>>
+        +inference(blob) Mat[]
+    }
+    class YoloOVNRT {
+        +inference(blob) Mat[]
+        +submit(blob)
+        +collect() Mat[]
+        -infer_req_[2] InferRequest
+    }
+    class YoloONNXRT {
+        +inference(blob) Mat[]
+    }
+    class YoloOpenCVRT {
+        +inference(blob) Mat[]
+    }
+    Yolo --> YoloTask : owns
+    YoloTask --> YoloRuntime : owns
+    YoloRuntime <|-- YoloOVNRT
+    YoloRuntime <|-- YoloONNXRT
+    YoloRuntime <|-- YoloOpenCVRT
+    YoloTask <|-- YoloDetTask
+    YoloTask <|-- YoloClsTask
+    YoloTask <|-- YoloSegTask
+    YoloTask <|-- YoloPoseTask
+    YoloTask <|-- YoloObbTask
+```
+
+---
+
+### Dataflow: Sequential (ORT CPU / OVN CPU / OVN GPU blocking)
+
+Used by all callers via `Yolo::predict()` or bench without `--pipeline`.  
+Each frame completes fully before the next begins.
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Task as YoloTask
+    participant RT as YoloRuntime
+    participant HW as CPU / GPU
+
+    App->>Task: predict(frame)
+    Task->>Task: letterbox + blobFromImage
+    Task->>RT: inference(blob)
+    RT->>HW: start_async(blob)
+    HW-->>RT: wait() [blocks]
+    RT-->>Task: raw_outputs[]
+    Task->>Task: NMS + decode → YoloResult
+    Task-->>App: YoloResult
+    Note over App,HW: next frame starts only after wait() returns
+```
+
+---
+
+### Dataflow: Pipeline (OVN GPU/NPU — submit/collect double-buffer)
+
+Used via `bench --pipeline` or any caller using `YoloOVNRT::submit()/collect()` directly.  
+CPU preprocessing of frame N+1 overlaps GPU inference on frame N.
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Task as YoloTask
+    participant OVN as YoloOVNRT
+    participant GPU as Intel UHD 620
+
+    App->>Task: preprocess(frame_0)
+    App->>OVN: submit(blob_0)
+    OVN->>GPU: start_async(req[0])
+    Note over GPU: GPU running frame 0 ↓
+
+    loop each frame N = 0..end
+        App->>Task: preprocess(frame_N+1)
+        Note over App,Task: CPU work runs while GPU finishes frame N
+        App->>OVN: submit(blob_N+1)
+        OVN->>GPU: start_async(req[1])
+        App->>OVN: collect()
+        OVN->>GPU: wait(req[0])
+        GPU-->>OVN: raw_outputs_N
+        OVN-->>App: raw_outputs_N
+        App->>Task: postprocess(raw_N)
+        Note over OVN: req slots alternate: req[0] ↔ req[1]
+    end
+    App->>OVN: collect() [drain last submit]
+```
+
+> **Zero-copy constraint**: the blob passed to `submit()` must remain alive until the matching `collect()` returns.
+> The bench tool uses `std::array<cv::Mat, 2>` to double-buffer blobs safely.
+
+---
+
+### Inference Path Selection
+
+```mermaid
+flowchart TD
+    A[YoloConfig] --> B{target_rt_}
+    B -->|ORT_CPU| C[YoloONNXRT\nonnxruntime CPU]
+    B -->|ORT_CUDA| D[YoloONNXRT\nonnxruntime CUDA]
+    B -->|OVN_CPU| E[YoloOVNRT\nOpenVINO CPU]
+    B -->|OVN_GPU| F[YoloOVNRT\nOpenVINO GPU]
+    B -->|OVN_AUTO| G[YoloOVNRT\nOpenVINO AUTO]
+    B -->|OPENCV_CPU| H[YoloOpenCVRT\nDNN CPU]
+    B -->|OPENCV_CUDA| I[YoloOpenCVRT\nDNN CUDA]
+
+    E --> J{API}
+    F --> J
+    G --> J
+    J -->|inference| K[blocking:\nstart_async + wait\nreq 0 only]
+    J -->|submit + collect| L[pipeline:\nreq 0 and 1 alternating\nCPU overlaps GPU]
+
+    style L fill:#d4edda,stroke:#28a745
+    style K fill:#fff3cd,stroke:#ffc107
+```
+
+---
+
 ## Sessions Log
+
+---
+
+### 2026-08-02f — Pipeline bench: submit/collect double-buffer across all models × precision × device
+
+**Branch / commit**: `develop` · current  
+**Test image**: `media/test_frame.jpg` (640×384 native — no resize needed)  
+**Note**: image differs from the canonical MOT17 test image; timings are not directly comparable to sessions 2026-08-02a–e.
+
+**Changes**
+- `include/YoloTask.h`: `preprocess()` / `postprocess()` moved to public; `runtime()` accessor added (`[[nodiscard]]`)
+- `include/Yolo.h`: `task()` accessor added (inline, `[[nodiscard]]`)
+- `tools/bench.cpp`: `--pipeline` flag — double-buffer loop using `YoloOVNRT::submit()/collect()` directly;
+  blob double-buffer (`std::array<cv::Mat,2>`) ensures zero-copy safety (blob stays alive until matching `collect()`)
+
+**Pipeline timing — OVN GPU (Intel UHD 620) · 50 iter · `media/test_frame.jpg`**
+
+| Model | Precision | pre | gpu\_wait | post | **total/iter** | **FPS** | infer est.¹ |
+|---|---|---:|---:|---:|---:|---:|---:|
+| yolo26n (static) | FP32 | 5.24 ms | 20.99 ms | 0.11 ms | **26.34 ms** | **38.0** | ~26.2 ms |
+| yolo26n (static) | FP16 | 5.28 ms | 21.26 ms | 0.11 ms | **26.65 ms** | **37.5** | ~26.5 ms |
+| yolox\_nano\_dec | FP32 | 5.17 ms | 9.01 ms | 1.04 ms | **15.22 ms** | **65.7** | ~14.2 ms |
+| yolox\_nano\_dec | FP16 | 5.23 ms | 9.01 ms | 1.06 ms | **15.30 ms** | **65.4** | ~14.2 ms |
+| bytetrack\_nano\_dec | FP32 | 5.68 ms | 7.42 ms | 0.79 ms | **13.89 ms** | **72.0** | ~13.1 ms |
+| bytetrack\_nano\_dec | FP16 | 5.19 ms | 7.60 ms | 0.80 ms | **13.59 ms** | **73.6** | ~12.8 ms |
+
+¹ `infer est. = pre + gpu_wait` — time from submit to collect (approximates true GPU execution time).
+
+**Pipeline timing — OVN CPU · 50 iter · `media/test_frame.jpg`**
+
+| Model | Precision | pre | gpu\_wait² | post | **total/iter** | **FPS** |
+|---|---|---:|---:|---:|---:|---:|
+| yolo26n (static) | FP32 | 7.69 ms | 36.23 ms | 0.24 ms | **44.16 ms** | **22.6** |
+| yolo26n (static) | FP16 | 6.85 ms | 37.57 ms | 0.22 ms | **44.65 ms** | **22.4** |
+| yolox\_nano\_dec | FP32 | 7.50 ms | 20.80 ms | 1.12 ms | **29.41 ms** | **34.0** |
+| yolox\_nano\_dec | FP16 | 7.36 ms | 22.90 ms | 1.25 ms | **31.51 ms** | **31.7** |
+| bytetrack\_nano\_dec | FP32 | 7.24 ms | 20.02 ms | 0.79 ms | **28.06 ms** | **35.6** |
+| bytetrack\_nano\_dec | FP16 | 7.36 ms | 20.93 ms | 0.88 ms | **29.16 ms** | **34.3** |
+
+² On CPU `gpu_wait` = synchronous inference time — no HW queue, no actual overlap. Pipeline API has no benefit on CPU.
+
+**Analysis**
+
+- **GPU pipeline `total/iter` ≈ GPU infer time** — CPU preprocessing is fully hidden behind the previous frame's GPU work for all models. Pipeline eliminates the sequential `pre + infer` stacking.
+- **`gpu_wait > 0` for all GPU models** confirms GPU inference is the throughput bottleneck on Intel UHD 620 — pre (5–6 ms) always finishes before infer (13–26 ms) completes. The pipeline provides real, measurable overlap.
+- **Compared to sequential GPU best** (MOT17 image, different image / conditions): sequential bytetrack FP32 = 12.58 ms (79.5 FPS); pipeline bytetrack FP32 = 13.89 ms (72.0 FPS) on this image. The delta is image-dependent — the pipeline eliminates `pre` from the critical path but cannot reduce raw GPU infer time.
+- **CPU pipeline is slower than GPU sequential** — no async HW queue on OVN CPU plugin; `start_async()+wait()` is effectively synchronous. CPU pipeline overhead (extra submit/collect bookkeeping) adds ~2–3 ms vs sequential.
+- **FP16 ≈ FP32 on GPU pipeline** — consistent with session 2026-08-02e: UHD 620 shows no throughput advantage for FP16 on these models.
 
 ---
 

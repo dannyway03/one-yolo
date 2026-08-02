@@ -376,7 +376,8 @@ id,cls_id,conf,label,track_id
 ```
 
 ## 🆒 architecture diagram
-![](./docs/architecture.png)
+
+See [docs/BENCHMARKS.md — System Architecture & Dataflow](./docs/BENCHMARKS.md#system-architecture--dataflow) for class hierarchy, sequential and pipeline dataflow diagrams (Mermaid, rendered on GitHub).
 
 ## 📚 references
 

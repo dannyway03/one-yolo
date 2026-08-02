@@ -19,6 +19,7 @@
 #include <cmath>
 #include <cstdlib>
 
+#include <array>
 #include <algorithm>
 #include <fstream>
 #include <iomanip>
@@ -31,6 +32,10 @@
 #include <vector>
 
 #include "Yolo.h"
+#include "YoloTask.h"
+#ifdef BUILD_WITH_OVN
+  #include "ovn/YoloOVNRT.h"
+#endif
 
 using namespace yolo;
 
@@ -111,6 +116,7 @@ struct Args
   std::string image_path_;
   std::string save_path_;
   std::string csv_path_;
+  bool pipeline_ = false;
 };
 
 static void
@@ -129,7 +135,8 @@ usage(const char* prog)
             << "  --iterations <int>               benchmark runs     (default: 100)\n"
             << "  --image      <path>              input image (random noise if omitted)\n"
             << "  --save       <path>              save annotated result image\n"
-            << "  --csv        <path>              append summary row to CSV\n";
+            << "  --csv        <path>              append summary row to CSV\n"
+            << "  --pipeline                       double-buffer mode: overlap CPU pre with GPU infer (OVN only)\n";
 }
 
 static auto
@@ -196,6 +203,10 @@ parse(int argc, char** argv) -> Args // NOLINT(modernize-avoid-c-arrays)
     else if (k == "--csv")
     {
       a.csv_path_ = need();
+    }
+    else if (k == "--pipeline")
+    {
+      a.pipeline_ = true;
     }
     else if (k == "--help" || k == "-h")
     {
@@ -285,7 +296,7 @@ buildConfig(const Args& a) -> YoloConfig
   // YOLOX expects raw pixel values; all other versions expect normalised [0, 1]
   cfg.scale_f_ = (a.version_str_ == "yolox") ? 1.0f : 1.0f / 255.0f;
   cfg.names_ = (a.classes_ == 80) ? std::vector<std::string>{COCO_NAMES} :
-                                   std::vector<std::string>(static_cast<size_t>(a.classes_), "obj");
+                                    std::vector<std::string>(static_cast<size_t>(a.classes_), "obj");
   return cfg;
 }
 
@@ -369,6 +380,85 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
 
     cv::Mat frame = makeFrame(a);
     std::vector<cv::Mat> batch{frame};
+
+#ifdef BUILD_WITH_OVN
+    if (a.pipeline_)
+    {
+      auto* ovn = dynamic_cast<yolo::YoloOVNRT*>(model.task()->runtime().get());
+      if (ovn == nullptr)
+        throw std::runtime_error("--pipeline requires --backend ovn");
+
+      std::cout << "mode       : pipeline (submit/collect double-buffer)\n\n";
+
+      // warm-up
+      std::cout << "warming up (" << a.warmup_ << " runs)...\n";
+      for (int i = 0; i < a.warmup_; ++i)
+        model(batch);
+
+      // Double-buffer blobs: GPU holds blobs[bidx^1] while CPU fills blobs[bidx].
+      // Each blob must stay alive until its matching collect() returns (zero-copy).
+      std::array<cv::Mat, 2> blobs;
+      int bidx = 0;
+      blobs[bidx] = model.task()->preprocess(batch);
+      ovn->submit(blobs[bidx]);
+      bidx ^= 1;
+
+      std::cout << "benchmarking (" << a.iterations_ << " runs)...\n\n";
+
+      using Clock = std::chrono::steady_clock;
+      std::vector<double> pre_ms, wait_ms, post_ms, total_ms;
+      pre_ms.reserve(static_cast<size_t>(a.iterations_));
+      wait_ms.reserve(static_cast<size_t>(a.iterations_));
+      post_ms.reserve(static_cast<size_t>(a.iterations_));
+      total_ms.reserve(static_cast<size_t>(a.iterations_));
+
+      for (int i = 0; i < a.iterations_; ++i)
+      {
+        auto t0 = Clock::now();
+        blobs[bidx] = model.task()->preprocess(batch); // CPU, overlaps GPU on blobs[bidx^1]
+        auto t1 = Clock::now();
+        ovn->submit(blobs[bidx]);
+        auto raw = ovn->collect(); // waits for blobs[bidx^1] — already safe to reuse next iter
+        auto t2 = Clock::now();
+        model.task()->postprocess(raw, 1);
+        auto t3 = Clock::now();
+        bidx ^= 1;
+
+        auto ms_of = [](auto a, auto b)
+        {
+          return std::chrono::duration<double, std::milli>(b - a).count();
+        };
+        pre_ms.push_back(ms_of(t0, t1));
+        wait_ms.push_back(ms_of(t1, t2));
+        post_ms.push_back(ms_of(t2, t3));
+        total_ms.push_back(ms_of(t0, t3));
+      }
+      ovn->collect(); // drain final submit
+
+      auto pre = computeStats(pre_ms);
+      auto wait = computeStats(wait_ms);
+      auto post = computeStats(post_ms);
+      auto tot = computeStats(total_ms);
+
+      const char* sep = "  ─────────────────────────────────────────────────────────────────────\n";
+      std::cout << sep;
+      std::cout << "  " << std::left << std::setw(14) << "phase" << std::right << std::setw(10) << "avg"
+                << std::setw(10) << "p50" << std::setw(10) << "p95" << std::setw(10) << "p99" << std::setw(10) << "min"
+                << std::setw(10) << "max"
+                << "\n";
+      std::cout << sep;
+      printRow("preprocess", pre);
+      printRow("gpu wait", wait);
+      printRow("postprocess", post);
+      std::cout << sep;
+      printRow("total/iter", tot);
+      std::cout << sep;
+      std::cout << "\nFPS (1000 / total_avg): " << std::fixed << std::setprecision(1)
+                << (tot.avg_ > 0.0 ? 1000.0 / tot.avg_ : 0.0) << "\n";
+      std::cout << "note: 'gpu wait' ~ 0 means full overlap achieved; total ≈ max(pre+post, infer)\n";
+      return 0;
+    }
+#endif
 
     // warm-up
     std::cout << "warming up (" << a.warmup_ << " runs)...\n";
