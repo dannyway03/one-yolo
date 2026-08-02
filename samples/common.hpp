@@ -19,11 +19,6 @@
 
 namespace app {
 
-constexpr int kDefaultW = 640;
-constexpr int kDefaultH = 640;
-constexpr int kDefaultClasses = 80;
-constexpr float kDefaultConf = 0.25f;
-constexpr float kDefaultIou = 0.45f;
 constexpr float kDefaultScale = 1.0f;
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
