@@ -57,7 +57,7 @@ protected:
                   YoloResult& result) = 0;
 
 public:
-  YoloTask(const YoloConfig& cfg);
+  YoloTask(YoloConfig cfg);
   ~YoloTask();
 
   [[nodiscard]] auto

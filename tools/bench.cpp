@@ -19,8 +19,8 @@
 #include <cmath>
 #include <cstdlib>
 
-#include <array>
 #include <algorithm>
+#include <array>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -49,7 +49,7 @@ struct Stats
   double p99_;
   double min_;
   double max_;
-  double stddev_;
+  [[maybe_unused]] double stddev_;
 };
 
 static auto

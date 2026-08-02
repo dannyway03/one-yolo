@@ -3,6 +3,7 @@
 #include <chrono>
 
 #include <stdexcept>
+#include <utility>
 
 #include "YoloOpenCVRT.h"
 #ifdef BUILD_WITH_ORT
@@ -19,7 +20,7 @@
 #endif
 namespace yolo {
 
-YoloTask::YoloTask(const YoloConfig& cfg) : _cfg(cfg)
+YoloTask::YoloTask(YoloConfig cfg) : _cfg(std::move(cfg))
 {
   switch (_cfg.target_rt_)
   {
@@ -64,10 +65,10 @@ YoloTask::YoloTask(const YoloConfig& cfg) : _cfg(cfg)
   }
 }
 
-YoloTask::~YoloTask() {}
+YoloTask::~YoloTask() = default;
 
-cv::Mat
-YoloTask::preprocess_one(const cv::Mat& image)
+auto
+YoloTask::preprocess_one(const cv::Mat& image) -> cv::Mat
 {
   assert(!image.empty());
 
@@ -84,7 +85,7 @@ YoloTask::preprocess_one(const cv::Mat& image)
     return resized;
   }
 
-  LetterBoxInfo info;
+  LetterBoxInfo info{};
   YoloUtils utils;
   cv::Mat lb = utils.letterbox(image, _cfg.input_w_, _cfg.input_h_, info);
   _orig_sizes.push_back(image.size());
@@ -94,8 +95,8 @@ YoloTask::preprocess_one(const cv::Mat& image)
   return lb;
 }
 
-cv::Mat
-YoloTask::preprocess(const std::vector<cv::Mat>& images)
+auto
+YoloTask::preprocess(const std::vector<cv::Mat>& images) -> cv::Mat
 {
   _orig_sizes.clear();
   _letterbox_infos.clear();
@@ -121,7 +122,7 @@ YoloTask::preprocess(const std::vector<cv::Mat>& images)
     {
       for (int c = 0; c < C; ++c)
       {
-        float* ptr = blob.ptr<float>(n, c);
+        auto* ptr = blob.ptr<float>(n, c);
         float m = _cfg.mean_[c];
         float s = _cfg.std_[c];
 
@@ -147,14 +148,14 @@ YoloTask::preprocess(const std::vector<cv::Mat>& images)
   return blob;
 }
 
-std::vector<cv::Mat>
-YoloTask::inference(const cv::Mat& blob)
+auto
+YoloTask::inference(const cv::Mat& blob) -> std::vector<cv::Mat>
 {
   return (*_rt).inference(blob);
 }
 
-std::vector<yolo::YoloResult>
-YoloTask::postprocess(const std::vector<cv::Mat>& raw_outputs, int batch_size)
+auto
+YoloTask::postprocess(const std::vector<cv::Mat>& raw_outputs, int batch_size) -> std::vector<yolo::YoloResult>
 {
   std::vector<yolo::YoloResult> results(batch_size);
   for (int i = 0; i < batch_size; ++i)
@@ -165,8 +166,8 @@ YoloTask::postprocess(const std::vector<cv::Mat>& raw_outputs, int batch_size)
   return results;
 }
 
-std::vector<yolo::YoloResult>
-YoloTask::run(const std::vector<cv::Mat>& images)
+auto
+YoloTask::run(const std::vector<cv::Mat>& images) -> std::vector<yolo::YoloResult>
 {
   /* step1. preprocess */
   auto t1 = std::chrono::system_clock::now();
@@ -211,8 +212,8 @@ YoloTask::run(const std::vector<cv::Mat>& images)
   return results;
 }
 
-std::vector<yolo::YoloResult>
-YoloTask::operator()(const std::vector<cv::Mat>& images)
+auto
+YoloTask::operator()(const std::vector<cv::Mat>& images) -> std::vector<yolo::YoloResult>
 {
   return run(images);
 }
