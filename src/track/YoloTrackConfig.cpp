@@ -10,4 +10,4 @@ auto
 to_string(YoloTrackLoc loc) -> std::string
 {}
 
-}
+} // namespace yolo

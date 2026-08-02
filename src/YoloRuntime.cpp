@@ -14,4 +14,4 @@ YoloRuntime::toString() -> std::string
   return rt_name_;
 }
 
-}
+} // namespace yolo

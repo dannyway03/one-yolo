@@ -83,9 +83,7 @@ draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int
 
         // the last one is located point
         if (j + 2 == one_track.size() && param.loc_radius > 0)
-        {
           cv::circle(canvas, p2, param.loc_radius, color, -1);
-        }
       }
     }
   }
@@ -121,9 +119,7 @@ draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int
       cv::addWeighted(overlay, mask_alpha, roi, 1.0f - mask_alpha, 0.0, roi, -1);
       // draw contour
       if (param.mask_line_width > 0)
-      {
         cv::drawContours(roi, std::vector<std::vector<cv::Point>>{one_contour}, -1, color, param.mask_line_width);
-      }
     }
 
     /*
@@ -225,17 +221,11 @@ draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int
         txt += "#" + std::to_string(track_ids[i]);
       }
       if (param.cls_ids)
-      {
         txt += (!txt.empty() ? ", " : "") + std::to_string(cls_ids[i]);
-      }
       if (param.labels)
-      {
         txt += (!txt.empty() ? ", " : "") + labels[i];
-      }
       if (param.confs)
-      {
         txt += (!txt.empty() ? ", " : "") + to_string(confs[i] * 100) + "%";
-      }
 
       // draw text
       if (!txt.empty())
@@ -276,17 +266,11 @@ draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int
 
       std::string txt;
       if (param.cls_ids)
-      {
         txt += std::to_string(cls_ids[i]);
-      }
       if (param.labels)
-      {
         txt += (!txt.empty() ? ", " : "") + labels[i];
-      }
       if (param.confs)
-      {
         txt += (!txt.empty() ? ", " : "") + to_string(confs[i] * 100) + "%";
-      }
 
       // draw text
       if (!txt.empty())
@@ -401,153 +385,135 @@ YoloUtils::letterbox(const cv::Mat& img, int new_w, int new_h, LetterBoxInfo& in
   return padded;
 }
 
-    void YoloUtils::class_aware_nms(
-        const std::vector<cv::Rect>& boxes,
-        const std::vector<float>& scores,
-        const std::vector<int>& cls_ids,
-        float conf_thresh,
-        float nms_thresh,
-        std::vector<int>& keep_indices
-    ) {
-        keep_indices.clear();
+void
+YoloUtils::class_aware_nms(const std::vector<cv::Rect>& boxes, const std::vector<float>& scores,
+                           const std::vector<int>& cls_ids, float conf_thresh, float nms_thresh,
+                           std::vector<int>& keep_indices)
+{
+  keep_indices.clear();
 
-        // class_id -> indices
-        std::unordered_map<int, std::vector<int>> cls_map;
-        for (int i = 0; i < (int)cls_ids.size(); ++i) {
-            cls_map[cls_ids[i]].push_back(i);
-        }
+  // class_id -> indices
+  std::unordered_map<int, std::vector<int>> cls_map;
+  for (int i = 0; i < (int)cls_ids.size(); ++i)
+    cls_map[cls_ids[i]].push_back(i);
 
-        // per-class NMS
-        for (const auto& kv : cls_map) {
-            const auto& indices = kv.second;
+  // per-class NMS
+  for (const auto& kv : cls_map)
+  {
+    const auto& indices = kv.second;
 
-            std::vector<cv::Rect> cls_boxes;
-            std::vector<float>    cls_scores;
+    std::vector<cv::Rect> cls_boxes;
+    std::vector<float> cls_scores;
 
-            cls_boxes.reserve(indices.size());
-            cls_scores.reserve(indices.size());
+    cls_boxes.reserve(indices.size());
+    cls_scores.reserve(indices.size());
 
-            for (int idx : indices) {
-                cls_boxes.emplace_back(boxes[idx]);
-                cls_scores.emplace_back(scores[idx]);
-            }
-
-            std::vector<int> cls_keep;
-            cv::dnn::NMSBoxes(
-                cls_boxes,
-                cls_scores,
-                conf_thresh,
-                nms_thresh,
-                cls_keep
-            );
-
-            // 映射回原索引
-            for (int k : cls_keep) {
-                keep_indices.push_back(indices[k]);
-            }
-        }
-    }
-
-    void YoloUtils::class_aware_nms(
-        const std::vector<cv::RotatedRect>& rboxes,
-        const std::vector<float>& scores,
-        const std::vector<int>& cls_ids,
-        float conf_thresh,
-        float nms_thresh,
-        std::vector<int>& keep_indices
-    ) {
-        keep_indices.clear();
-
-        // class_id -> indices
-        std::unordered_map<int, std::vector<int>> cls_map;
-        for (int i = 0; i < (int)cls_ids.size(); ++i) {
-            cls_map[cls_ids[i]].push_back(i);
-        }
-
-        // per-class NMS
-        for (const auto& kv : cls_map) {
-            const auto& indices = kv.second;
-
-            std::vector<cv::RotatedRect> cls_rboxes;
-            std::vector<float>    cls_scores;
-
-            cls_rboxes.reserve(indices.size());
-            cls_scores.reserve(indices.size());
-
-            for (int idx : indices) {
-                cls_rboxes.emplace_back(rboxes[idx]);
-                cls_scores.emplace_back(scores[idx]);
-            }
-
-            std::vector<int> cls_keep;
-            cv::dnn::NMSBoxes(
-                cls_rboxes,
-                cls_scores,
-                conf_thresh,
-                nms_thresh,
-                cls_keep
-            );
-
-            // 映射回原索引
-            for (int k : cls_keep) {
-                keep_indices.push_back(indices[k]);
-            }
-        }
-    }
-
-    auto
-    YoloUtils::decode_box(float cx, float cy, float w, float h, const LetterBoxInfo& lb, const cv::Size& orig_size)
-      -> cv::Rect
+    for (int idx : indices)
     {
-      float x1 = cx - w * 0.5f;
-      float y1 = cy - h * 0.5f;
-      float x2 = cx + w * 0.5f;
-      float y2 = cy + h * 0.5f;
-
-      x1 = (x1 - lb.pad_w) / lb.scale;
-      y1 = (y1 - lb.pad_h) / lb.scale;
-      x2 = (x2 - lb.pad_w) / lb.scale;
-      y2 = (y2 - lb.pad_h) / lb.scale;
-
-      x1 = std::clamp(x1, 0.f, (float)orig_size.width - 1.f);
-      y1 = std::clamp(y1, 0.f, (float)orig_size.height - 1.f);
-      x2 = std::clamp(x2, 0.f, (float)orig_size.width - 1.f);
-      y2 = std::clamp(y2, 0.f, (float)orig_size.height - 1.f);
-
-      return {(int)x1, (int)y1, (int)(x2 - x1), (int)(y2 - y1)};
+      cls_boxes.emplace_back(boxes[idx]);
+      cls_scores.emplace_back(scores[idx]);
     }
 
-    auto
-    YoloUtils::decode_keypoint(float x, float y, float conf, const LetterBoxInfo& lb, const cv::Size& orig_size)
-      -> YoloKeyPoint
-    {
-      x = (x - lb.pad_w) / lb.scale;
-      y = (y - lb.pad_h) / lb.scale;
+    std::vector<int> cls_keep;
+    cv::dnn::NMSBoxes(cls_boxes, cls_scores, conf_thresh, nms_thresh, cls_keep);
 
-      x = std::clamp(x, 0.f, (float)orig_size.width - 1.f);
-      y = std::clamp(y, 0.f, (float)orig_size.height - 1.f);
-
-      return YoloKeyPoint{x, y, conf};
-    }
-
-    auto
-    YoloUtils::decode_rbox(float cx, float cy, float w, float h, float angle, const LetterBoxInfo& lb,
-                           const cv::Size& orig_size) -> cv::RotatedRect
-    {
-      cx = (cx - lb.pad_w) / lb.scale;
-      cy = (cy - lb.pad_h) / lb.scale;
-
-      w = w / lb.scale;
-      h = h / lb.scale;
-
-      cx = std::clamp(cx, 0.f, (float)orig_size.width - 1.f);
-      cy = std::clamp(cy, 0.f, (float)orig_size.height - 1.f);
-
-      w = std::clamp(w, 0.f, (float)orig_size.width - 1.f);
-      h = std::clamp(h, 0.f, (float)orig_size.height - 1.f);
-
-      float angle_deg = angle * 180.0f / CV_PI;
-      return {cv::Point(cx, cy), cv::Size(w, h), angle_deg};
-    }
-
+    // 映射回原索引
+    for (int k : cls_keep)
+      keep_indices.push_back(indices[k]);
+  }
 }
+
+void
+YoloUtils::class_aware_nms(const std::vector<cv::RotatedRect>& rboxes, const std::vector<float>& scores,
+                           const std::vector<int>& cls_ids, float conf_thresh, float nms_thresh,
+                           std::vector<int>& keep_indices)
+{
+  keep_indices.clear();
+
+  // class_id -> indices
+  std::unordered_map<int, std::vector<int>> cls_map;
+  for (int i = 0; i < (int)cls_ids.size(); ++i)
+    cls_map[cls_ids[i]].push_back(i);
+
+  // per-class NMS
+  for (const auto& kv : cls_map)
+  {
+    const auto& indices = kv.second;
+
+    std::vector<cv::RotatedRect> cls_rboxes;
+    std::vector<float> cls_scores;
+
+    cls_rboxes.reserve(indices.size());
+    cls_scores.reserve(indices.size());
+
+    for (int idx : indices)
+    {
+      cls_rboxes.emplace_back(rboxes[idx]);
+      cls_scores.emplace_back(scores[idx]);
+    }
+
+    std::vector<int> cls_keep;
+    cv::dnn::NMSBoxes(cls_rboxes, cls_scores, conf_thresh, nms_thresh, cls_keep);
+
+    // 映射回原索引
+    for (int k : cls_keep)
+      keep_indices.push_back(indices[k]);
+  }
+}
+
+auto
+YoloUtils::decode_box(float cx, float cy, float w, float h, const LetterBoxInfo& lb, const cv::Size& orig_size)
+  -> cv::Rect
+{
+  float x1 = cx - w * 0.5f;
+  float y1 = cy - h * 0.5f;
+  float x2 = cx + w * 0.5f;
+  float y2 = cy + h * 0.5f;
+
+  x1 = (x1 - lb.pad_w) / lb.scale;
+  y1 = (y1 - lb.pad_h) / lb.scale;
+  x2 = (x2 - lb.pad_w) / lb.scale;
+  y2 = (y2 - lb.pad_h) / lb.scale;
+
+  x1 = std::clamp(x1, 0.f, (float)orig_size.width - 1.f);
+  y1 = std::clamp(y1, 0.f, (float)orig_size.height - 1.f);
+  x2 = std::clamp(x2, 0.f, (float)orig_size.width - 1.f);
+  y2 = std::clamp(y2, 0.f, (float)orig_size.height - 1.f);
+
+  return {(int)x1, (int)y1, (int)(x2 - x1), (int)(y2 - y1)};
+}
+
+auto
+YoloUtils::decode_keypoint(float x, float y, float conf, const LetterBoxInfo& lb, const cv::Size& orig_size)
+  -> YoloKeyPoint
+{
+  x = (x - lb.pad_w) / lb.scale;
+  y = (y - lb.pad_h) / lb.scale;
+
+  x = std::clamp(x, 0.f, (float)orig_size.width - 1.f);
+  y = std::clamp(y, 0.f, (float)orig_size.height - 1.f);
+
+  return YoloKeyPoint{x, y, conf};
+}
+
+auto
+YoloUtils::decode_rbox(float cx, float cy, float w, float h, float angle, const LetterBoxInfo& lb,
+                       const cv::Size& orig_size) -> cv::RotatedRect
+{
+  cx = (cx - lb.pad_w) / lb.scale;
+  cy = (cy - lb.pad_h) / lb.scale;
+
+  w = w / lb.scale;
+  h = h / lb.scale;
+
+  cx = std::clamp(cx, 0.f, (float)orig_size.width - 1.f);
+  cy = std::clamp(cy, 0.f, (float)orig_size.height - 1.f);
+
+  w = std::clamp(w, 0.f, (float)orig_size.width - 1.f);
+  h = std::clamp(h, 0.f, (float)orig_size.height - 1.f);
+
+  float angle_deg = angle * 180.0f / CV_PI;
+  return {cv::Point(cx, cy), cv::Size(w, h), angle_deg};
+}
+
+} // namespace yolo

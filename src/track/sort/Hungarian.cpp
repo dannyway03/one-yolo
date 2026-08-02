@@ -1,10 +1,10 @@
 ///////////////////////////////////////////////////////////////////////////////
 // Hungarian.cpp: Implementation file for Class HungarianAlgorithm.
-// 
+//
 // This is a C++ wrapper with slight modification of a hungarian algorithm implementation by Markus Buehren.
 // The original implementation is a few mex-functions for use in MATLAB, found here:
 // http://www.mathworks.com/matlabcentral/fileexchange/6543-functions-for-the-rectangular-assignment-problem
-// 
+//
 // Both this code and the orignal code are published under the BSD license.
 // by Cong Ma, 2016
 //
@@ -53,9 +53,9 @@ HungarianAlgorithm::Solve(vector<vector<double>>& dist_matrix, vector<int>& assi
   return cost;
 }
 
-        //********************************************************//
-	// Solve optimal solution for assignment problem using Munkres algorithm, also known as Hungarian Algorithm.
-	//********************************************************//
+//********************************************************//
+// Solve optimal solution for assignment problem using Munkres algorithm, also known as Hungarian Algorithm.
+//********************************************************//
 void
 HungarianAlgorithm::assignmentoptimal(int* assignment, double* cost, double* dist_matrix_in, int n_of_rows,
                                       int n_of_columns)
@@ -184,7 +184,7 @@ HungarianAlgorithm::assignmentoptimal(int* assignment, double* cost, double* dis
   free(new_star_matrix);
 }
 
-        /********************************************************/
+/********************************************************/
 void
 HungarianAlgorithm::buildassignmentvector(int* assignment, bool* star_matrix, int n_of_rows, int n_of_columns)
 {
@@ -203,7 +203,7 @@ HungarianAlgorithm::buildassignmentvector(int* assignment, bool* star_matrix, in
       }
 }
 
-        /********************************************************/
+/********************************************************/
 void
 HungarianAlgorithm::computeassignmentcost(int* assignment, double* cost, double* dist_matrix, int n_of_rows)
 {
@@ -216,7 +216,7 @@ HungarianAlgorithm::computeassignmentcost(int* assignment, double* cost, double*
   }
 }
 
-        /********************************************************/
+/********************************************************/
 void
 HungarianAlgorithm::step2a(int* assignment, double* dist_matrix, bool* star_matrix, bool* new_star_matrix,
                            bool* prime_matrix, bool* covered_columns, bool* covered_rows, int n_of_rows,
@@ -245,7 +245,7 @@ HungarianAlgorithm::step2a(int* assignment, double* dist_matrix, bool* star_matr
          n_of_columns, min_dim);
 }
 
-        /********************************************************/
+/********************************************************/
 void
 HungarianAlgorithm::step2b(int* assignment, double* dist_matrix, bool* star_matrix, bool* new_star_matrix,
                            bool* prime_matrix, bool* covered_columns, bool* covered_rows, int n_of_rows,
@@ -272,7 +272,7 @@ HungarianAlgorithm::step2b(int* assignment, double* dist_matrix, bool* star_matr
   }
 }
 
-        /********************************************************/
+/********************************************************/
 void
 HungarianAlgorithm::step3(int* assignment, double* dist_matrix, bool* star_matrix, bool* new_star_matrix,
                           bool* prime_matrix, bool* covered_columns, bool* covered_rows, int n_of_rows,
@@ -320,7 +320,7 @@ HungarianAlgorithm::step3(int* assignment, double* dist_matrix, bool* star_matri
         n_of_columns, min_dim);
 }
 
-        /********************************************************/
+/********************************************************/
 void
 HungarianAlgorithm::step4(int* assignment, double* dist_matrix, bool* star_matrix, bool* new_star_matrix,
                           bool* prime_matrix, bool* covered_columns, bool* covered_rows, int n_of_rows,
@@ -378,7 +378,7 @@ HungarianAlgorithm::step4(int* assignment, double* dist_matrix, bool* star_matri
          n_of_columns, min_dim);
 }
 
-        /********************************************************/
+/********************************************************/
 void
 HungarianAlgorithm::step5(int* assignment, double* dist_matrix, bool* star_matrix, bool* new_star_matrix,
                           bool* prime_matrix, bool* covered_columns, bool* covered_rows, int n_of_rows,
@@ -416,4 +416,4 @@ HungarianAlgorithm::step5(int* assignment, double* dist_matrix, bool* star_matri
         n_of_columns, min_dim);
 }
 
-}
+} // namespace yolo
