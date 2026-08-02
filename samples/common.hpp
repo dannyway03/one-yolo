@@ -59,24 +59,6 @@ isCameraIndex(std::string_view s) -> bool
 
 // ── config builders ───────────────────────────────────────────────────────────
 
-[[nodiscard]] inline auto
-resolveVersion(const std::string& s) -> yolo::YoloVersion
-{
-  if (s == "yolo5")
-    return yolo::YoloVersion::YOLO5;
-  if (s == "yolo5u")
-    return yolo::YoloVersion::YOLO5U;
-  if (s == "yolo8")
-    return yolo::YoloVersion::YOLO8;
-  if (s == "yolo11")
-    return yolo::YoloVersion::YOLO11;
-  if (s == "yolo26")
-    return yolo::YoloVersion::YOLO26;
-  // decoded YOLOX output matches the YOLO5 decoder layout [cx,cy,w,h,obj_conf,cls...]
-  if (s == "yolox")
-    return yolo::YoloVersion::YOLO5;
-  throw std::runtime_error("unknown --version: " + s);
-}
 
 [[nodiscard]] inline auto
 buildYoloConfig(const CliArgs& a, yolo::YoloTaskType /*task*/) -> yolo::YoloConfig
