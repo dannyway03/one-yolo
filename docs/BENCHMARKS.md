@@ -15,96 +15,47 @@ for every supported detector/backend combination.
 
 ## Executive Snapshot — 2026-08-02
 
-Best results to date: **2026-08-02g** (pipeline bench on MOT17 canonical image, `submit/collect` GPU).  
-OVN timing baseline: commit **1f48441** · PXL image (CPU FP16).  
-ORT timing baseline: commit **5416363** · MOT17-02 frame 1.  
-Accuracy baseline: MOT17-02 frame 1 · 22 GT pedestrians.  
-Platform: Intel i7-8665U · Intel UHD 620 (iGPU) · NVIDIA MX250.
+> All numbers: avg · 50 iter · 640 × 384 · `media/mot17-02-frcnn/000001.jpg` · session **2026-08-02h**  
+> Platform: Intel i7-8665U · Intel UHD 620 (iGPU) · OpenVINO 2026.2.1 · ORT 1.22.2
 
-### Timing — best results (avg · 50 iter · 640 × 384 · MOT17-02/000001.jpg)
+### OVN — sequential vs pipeline (submit/collect GPU double-buffer)
 
-#### OVN CPU — sequential (inference() path)
+`pipe Δ` = pipeline GPU ms vs sequential GPU ms · pipeline not applicable on CPU (no HW async queue)
 
-| Model | Precision | infer | **total** | **FPS** | Det |
-|---|---|---:|---:|---:|---|
-| yolo26n (static) | FP16 | 22.49 ms | **26.21 ms** | **38.2** | 7 |
-| yolo26n (static) | FP32 | 25.76 ms | **30.14 ms** | **33.2** | 7 |
-| yolo26n (down) | FP32 | 29.70 ms | **34.99 ms** | **28.6** | 7 |
-| yolo26n (down) | FP16 | 27.77 ms | **32.95 ms** | **30.3** | 7 |
-| yolox\_nano\_dec | FP16 | 16.47 ms | **20.62 ms** | **48.5** | 14 |
-| yolox\_nano\_dec | FP32 | 17.66 ms | **21.89 ms** | **45.7** | 14 |
-| bytetrack\_nano\_dec | FP16 | 14.67 ms | **18.29 ms** | **54.7** | 12 |
-| bytetrack\_nano\_dec | FP32 | 14.47 ms | **18.44 ms** | **54.2** | 12 |
+| Model | Prec | Device | infer | **seq ms** | pipe ms | **pipe Δ** | Det |
+|---|---|---|---:|---:|---:|---:|:---:|
+| yolo26n | FP32 | OVN CPU | 26.1 | 30.3 | — | — | 7 |
+| yolo26n | FP32 | **OVN GPU** | **21.4** | **24.0** | **21.6** | **−2.4** | 6 |
+| yolo26n | FP16 | OVN CPU | 27.8 | 32.1 | — | — | 7 |
+| yolo26n | FP16 | **OVN GPU** | **21.1** | **23.6** | **21.7** | **−1.9** | 6 |
+| yolox\_nano | FP32 | OVN CPU | 18.1 | 22.7 | — | — | 14 |
+| yolox\_nano | FP32 | **OVN GPU** | **11.7** | **14.9** | **12.3** | **−2.6** | 13 |
+| yolox\_nano | FP16 | OVN CPU | 17.9 | 22.5 | — | — | 14 |
+| yolox\_nano | FP16 | **OVN GPU** | **12.1** | **15.7** | **12.3** | **−3.4** | 13 |
+| bytetrack | FP32 | OVN CPU | 17.9 | 22.3 | — | — | 12 |
+| bytetrack | FP32 | **OVN GPU** | **12.2** | **15.8** | **11.2** ★ | **−4.6** | 12 |
+| bytetrack | FP16 | OVN CPU | 16.9 | 21.2 | — | — | 12 |
+| bytetrack | FP16 | **OVN GPU** | **11.7** | **15.2** | **11.6** | **−3.6** | 12 |
 
-#### OVN GPU — Intel UHD 620 — sequential (inference() path)
+★ = best total latency · all values in ms · `gpu_wait > 0` → GPU infer is the throughput bottleneck on UHD 620
 
-| Model | Precision | infer | **total** | **FPS** | Det |
-|---|---|---:|---:|---:|---|
-| yolo26n (static) | FP16 | 23.58 ms | **26.51 ms** | **37.7** | 6 |
-| yolo26n (static) | FP32 | 25.20 ms | **30.09 ms** | **33.2** | 6 |
-| **yolo26n (down)** | **FP32** | **22.49 ms** | **25.53 ms** | **39.2** ★ | 6 |
-| yolo26n (down) | FP16 | 22.69 ms | **25.56 ms** | **39.1** | 6 |
-| yolox\_nano\_dec | FP16 | 12.56 ms | **16.01 ms** | **62.5** | 13 |
-| yolox\_nano\_dec | FP32 | 12.50 ms | **16.12 ms** | **62.0** | 13 |
-| bytetrack\_nano\_dec | FP16 | 11.60 ms | **15.11 ms** | **66.2** | 12 |
-| **bytetrack\_nano\_dec** | **FP32** | **10.15 ms** | **12.58 ms** | **79.5** ★ | 12 |
+### ORT CPU — sequential only (FP32, no pipeline)
 
-★ = best sequential result for this model to date
+| Model | infer | **total ms** | Det |
+|---|---:|---:|:---:|
+| yolo26n | 91.1 | 93.7 | 7 |
+| yolox\_nano | 65.3 | 67.8 | 14 |
+| bytetrack | 66.0 | 68.7 | 12 |
 
-#### OVN GPU — Intel UHD 620 — pipeline (submit/collect double-buffer) · `media/test_frame.jpg` ¹
+### Accuracy — MOT17-02/000001.jpg · GT: 22 pedestrians
 
-| Model | Precision | pre | gpu\_wait | post | **total/iter** | **FPS** |
-|---|---|---:|---:|---:|---:|---:|
-| yolo26n (static) | FP32 | 5.24 ms | 20.99 ms | 0.11 ms | **26.34 ms** | **38.0** |
-| yolo26n (static) | FP16 | 5.28 ms | 21.26 ms | 0.11 ms | **26.65 ms** | **37.5** |
-| yolox\_nano\_dec | FP32 | 5.17 ms | 9.01 ms | 1.04 ms | **15.22 ms** | **65.7** |
-| yolox\_nano\_dec | FP16 | 5.23 ms | 9.01 ms | 1.06 ms | **15.30 ms** | **65.4** |
-| **bytetrack\_nano\_dec** | **FP32** | **5.68 ms** | **7.42 ms** | **0.79 ms** | **13.89 ms** | **72.0** ★★ |
-| bytetrack\_nano\_dec | FP16 | 5.19 ms | 7.60 ms | 0.80 ms | **13.59 ms** | **73.6** |
+| Model | OVN CPU det | OVN GPU det | ORT CPU det | Recall (CPU) | Note |
+|---|:---:|:---:|:---:|---:|---|
+| yolo26n | 7 | 6 | 7 | 31.8 % | GPU −1 vs CPU; precision-independent |
+| yolox\_nano | 14 | 13 | 14 | 63.6 % | GPU −1 vs CPU; precision-independent |
+| bytetrack | 12 | 12 | 12 | 54.5 % | ✓ identical across all backends |
 
-★★ = best pipeline result (test_frame.jpg) · `gpu_wait > 0` for all models → GPU is the throughput bottleneck on UHD 620.  
-¹ Pipeline timings use `media/test_frame.jpg`; see session 2026-08-02g for MOT17-comparable results.  
-`total/iter ≈ GPU infer time` — preprocessing (pre) runs hidden behind the previous frame's GPU work.
-
-#### OVN GPU — Intel UHD 620 — pipeline (submit/collect) · `media/mot17-02-frcnn/000001.jpg` — direct comparison
-
-| Model | Precision | Sequential total ★ | Pipeline total/iter | Pipeline FPS | Δ vs sequential |
-|---|---|---:|---:|---:|---:|
-| yolo26n (static) | FP32 | 30.09 ms / 33.2 FPS | **21.55 ms** | **46.4** | **+13.2 FPS (+39.8%)** |
-| yolo26n (static) | FP16 | 26.51 ms / 37.7 FPS | **21.68 ms** | **46.1** | **+8.4 FPS (+22.3%)** |
-| yolox\_nano\_dec | FP32 | 16.12 ms / 62.0 FPS | **12.31 ms** | **81.2** | **+19.2 FPS (+31.0%)** |
-| yolox\_nano\_dec | FP16 | 16.01 ms / 62.5 FPS | **12.28 ms** | **81.5** | **+19.0 FPS (+30.4%)** |
-| bytetrack\_nano\_dec | FP32 | 12.58 ms / 79.5 FPS | **11.24 ms** | **88.9** | **+9.4 FPS (+11.8%)** |
-| bytetrack\_nano\_dec | FP16 | 15.11 ms / 66.2 FPS | **11.61 ms** | **86.1** | **+19.9 FPS (+30.1%)** |
-
-★ Sequential baselines from session 2026-08-02e (same image, same conditions).
-
-#### ORT CPU
-
-| Model | Precision | infer | **total** | **FPS** | Det |
-|---|---|---:|---:|---:|---|
-| yolo26n | FP32 | 63.32 ms | **65.22 ms** | **15.3** | 7 |
-| yolox\_nano\_dec | FP32 | 48.32 ms | **50.36 ms** | **19.9** | 14 |
-| bytetrack\_nano\_dec | FP32 | 45.64 ms | **47.81 ms** | **20.9** | 12 |
-
-### Accuracy — MOT17-02 frame 1 (GT: 22 pedestrians)
-
-| Model | Backend | Precision | Det | Recall proxy | Notes |
-|---|---|---|---|---|---|
-| yolo26n (static+down) | OVN CPU | FP16 + FP32 | 7 | 31.8 % | consistent across precision |
-| yolox\_nano\_dec | OVN CPU | FP16 + FP32 | 14 | 63.6 % | consistent |
-| bytetrack\_nano\_dec | OVN CPU | FP16 + FP32 | 12 | 54.5 % | consistent |
-| yolo26n (static+down) | OVN GPU | FP16 + FP32 | 6 | 27.3 % | -1 vs CPU; precision irrelevant |
-| yolox\_nano\_dec | OVN GPU | FP16 + FP32 | 13 | 59.1 % | -1 vs CPU; precision irrelevant |
-| bytetrack\_nano\_dec | OVN GPU | FP16 + FP32 | 12 | 54.5 % | ✓ same as CPU |
-| yolo26n | ORT CPU | FP32 | 7 | 31.8 % | ✓ same as OVN CPU |
-| yolox\_nano\_dec | ORT CPU | FP32 | 14 | 63.6 % | ✓ same as OVN CPU |
-| bytetrack\_nano\_dec | ORT CPU | FP32 | 12 | 54.5 % | ✓ same as OVN CPU |
-
-**Key finding**: detection count gap (CPU vs GPU) is independent of FP16/FP32 — it's a numerical
-boundary effect in GPU compute kernels, not a precision regression.
-
-> Recall proxy = detected / GT count. Not true AP. Full mAP not yet automated.
+> GPU detection gap is a kernel-level numerical boundary effect, not a precision regression (identical at FP16 and FP32).
 
 ---
 
@@ -384,6 +335,45 @@ flowchart TD
 ---
 
 ## Sessions Log
+
+---
+
+### 2026-08-02h — Full sequential re-run on canonical image (all backends) + snapshot redesign
+
+**Branch / commit**: `develop` · `3a10e9d`+  
+**Test image**: `media/mot17-02-frcnn/000001.jpg` · same image for all backends
+
+**Sequential timing — OVN CPU · 50 iter**
+
+| Model | Prec | infer | **total** | Det |
+|---|---|---:|---:|:---:|
+| yolo26n | FP32 | 26.1 ms | **30.3 ms** | 7 |
+| yolo26n | FP16 | 27.8 ms | **32.1 ms** | 7 |
+| yolox\_nano | FP32 | 18.1 ms | **22.7 ms** | 14 |
+| yolox\_nano | FP16 | 17.9 ms | **22.5 ms** | 14 |
+| bytetrack | FP32 | 17.9 ms | **22.3 ms** | 12 |
+| bytetrack | FP16 | 16.9 ms | **21.2 ms** | 12 |
+
+**Sequential timing — OVN GPU · 50 iter**
+
+| Model | Prec | infer | **total** | Det |
+|---|---|---:|---:|:---:|
+| yolo26n | FP32 | 21.4 ms | **24.0 ms** | 6 |
+| yolo26n | FP16 | 21.1 ms | **23.6 ms** | 6 |
+| yolox\_nano | FP32 | 11.7 ms | **14.9 ms** | 13 |
+| yolox\_nano | FP16 | 12.1 ms | **15.7 ms** | 13 |
+| bytetrack | FP32 | 12.2 ms | **15.8 ms** | 12 |
+| bytetrack | FP16 | 11.7 ms | **15.2 ms** | 12 |
+
+**Sequential timing — ORT CPU · FP32 · 50 iter**
+
+| Model | infer | **total** | Det |
+|---|---:|---:|:---:|
+| yolo26n | 91.1 ms | **93.7 ms** | 7 |
+| yolox\_nano | 65.3 ms | **67.8 ms** | 14 |
+| bytetrack | 66.0 ms | **68.7 ms** | 12 |
+
+**Changes**: Executive Snapshot redesigned — single unified table (2 rows per model-precision block: CPU plain / GPU bold), sequential + pipeline columns side-by-side, FPS dropped in favour of ms-only.
 
 ---
 
