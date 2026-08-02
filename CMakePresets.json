@@ -11,7 +11,8 @@
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
         "CMAKE_CXX_FLAGS": "-Wall -Wextra",
         "onnxruntime_DIR": "/home/briox/Software/cpp/libs/onnxruntime_v1.22.2/install/Ubuntu/OVEP/RelWithDebInfo/lib/cmake/onnxruntime",
-        "OpenCV_DIR": "/home/briox/Software/cpp/libs/opencv-4.10.0/installGCC/tbbOrtOV/lib/cmake/opencv4"
+        "OpenCV_DIR": "/home/briox/Software/cpp/libs/opencv-4.10.0/installGCC/tbbOrtOV/lib/cmake/opencv4",
+        "OpenVINO_DIR": "/home/briox/intel/openvino2026.2.1.21919/runtime/cmake/"
       }
     },
     {

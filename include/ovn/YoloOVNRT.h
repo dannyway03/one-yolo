@@ -12,6 +12,7 @@ namespace yolo {
     private:
         ov::Core core_;
         ov::CompiledModel compiled_model_;
+        ov::InferRequest infer_request_;
     public:
         YoloOVNRT(
             const std::string& model_path, 

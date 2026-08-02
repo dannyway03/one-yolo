@@ -5,7 +5,7 @@
  * YoloConfig / Yolo class, so numbers reflect real application cost.
  *
  * Usage:
- *   bench --model <path> --version <yolox|yolo26|yolo11|yolo8|yolo5|yolo5u>
+ *   bench --model <path> --version <yolox|bytetrack|yolo26|yolo11|yolo8|yolo5|yolo5u>
  *         --backend <ort|ovn|dnn> [--device <cpu|gpu|auto|cuda>]
  *         [--task <det|cls|seg|pose|obb>]
  *         [--input-w 640] [--input-h 640] [--classes 80]
@@ -118,7 +118,7 @@ usage(const char* prog)
 {
   std::cerr << "usage: " << prog << "\n"
             << "  --model      <path>              model file (.onnx / .xml)\n"
-            << "  --version    <yolox|yolo26|yolo11|yolo8|yolo5|yolo5u>  (default: yolox)\n"
+            << "  --version    <yolox|bytetrack|yolo26|yolo11|yolo8|yolo5|yolo5u>  (default: yolox)\n"
             << "  --backend    <ort|ovn|dnn>       inference backend (default: ort)\n"
             << "  --device     <cpu|gpu|auto|cuda> device for backend (default: cpu)\n"
             << "  --task       <det|cls|seg|pose|obb> (default: det)\n"
@@ -229,6 +229,8 @@ resolveVersion(const std::string& s) -> YoloVersion
     return YoloVersion::YOLO26;
   if (s == "yolox")
     return YoloVersion::YOLO5; // decoded YOLOX → YOLO5 decoder
+  if (s == "bytetrack")
+    return YoloVersion::YOLO5; // bytetrack decoded output shares YOLOX/YOLO5 format
   throw std::runtime_error("unknown --version: " + s);
 }
 
