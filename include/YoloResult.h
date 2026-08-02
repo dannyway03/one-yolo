@@ -28,11 +28,8 @@ namespace yolo {
 struct YoloResult
 {
   /* structured results */
-  std::vector<YoloClsObj> classes;       // YoloClsObj list for classification task
-  std::vector<YoloDetObj> detections;    // YoloDetObj list for detection task
-  std::vector<YoloSegObj> segmentations; // YoloSegObj list for segmentation task
-  std::vector<YoloPoseObj> poses;        // YoloPoseObj list for pose task
-  std::vector<YoloObbObj> obbs;          // YoloObbObj list for obb task
+  std::vector<YoloClsObj> classes;    // YoloClsObj list for classification task
+  std::vector<YoloDetObj> detections; // YoloDetObj list for detection task
 
   /* debug information */
   int id = -1; // -1 means not initialized by Yolo. set as batch index if Yolo works with batch mode, or 0 forever.
@@ -205,140 +202,14 @@ struct YoloResult
   std::vector<std::string>
   top5_labels() const;
 
-  /* easy api for detection/segmentation/pose/obb tasks. */
-  /******************************************************/
-  /**
-   * @brief
-   * get boxes list from detection/segmentation/pose tasks.
-   *
-   * @return
-   * boxes list.
-   *
-   * @note
-   * throw error if it's not a detection|segmentation|pose task.
-   */
-  std::vector<cv::Rect>
-  boxes() const;
-
-  /**
-   * @brief
-   * get rotated boxes list from obb task.
-   *
-   * @return
-   * rotated boxes list。
-   *
-   * @note
-   * throw error if it's not a obb task.
-   */
-  std::vector<cv::RotatedRect>
-  rboxes() const;
-
-  /**
-   * @brief
-   * get class ids list from detection/segmentation/pose/obb tasks.
-   *
-   * @return
-   * class ids list.
-   *
-   * @note
-   * throw error if it's not a detection|segmentation|pose|obb task.
-   */
-  std::vector<int>
-  cls_ids() const;
-
-  /**
-   * @brief
-   * get confidences list from detection/segmentation/pose/obb tasks.
-   *
-   * @return
-   * confidences list.
-   *
-   * @note
-   * throw error if it's not a detection|segmentation|pose|obb task.
-   */
-  std::vector<float>
-  confs() const;
-
-  /**
-   * @brief
-   * get labels list from detection/segmentation/pose/obb tasks.
-   *
-   * @return
-   * labels list.
-   *
-   * @note
-   * throw error if it's not a detection|segmentation|pose|obb task.
-   */
-  std::vector<std::string>
-  labels() const;
-
-  /**
-   * @brief
-   * get masks list from segmentation task.
-   *
-   * @return
-   * masks list.
-   *
-   * it's local  mask: has the same size as bounding box of detected object.
-   * it's binary mask: 0 or 255, 0 means background, 255 means object area.
-   *
-   * @note
-   * throw error if it's not a segmentation task.
-   */
-  std::vector<cv::Mat>
-  masks() const;
-
-  /**
-   * @brief
-   * get contours list from segmentation task.
-   *
-   * @return
-   * contours list.
-   *
-   * @note
-   * throw error if it's not a segmentation task.
-   */
-  std::vector<std::vector<cv::Point>>
-  contours() const;
-
-  /**
-   * @brief
-   * get keypoints list from pose task.
-   *
-   * @return
-   * keypoints list.
-   *
-   * @note
-   * throw error if it's not a pose task.
-   */
-  std::vector<std::vector<YoloKeyPoint>>
-  kpts() const;
-
-  /**
-   * @brief
-   * get track ids list from detection/segmentation/pose tasks.
-   *
-   * @return
-   * track ids list.
-   *
-   * @note
-   * throw error if it's not a detection|segmentation|pose task.
-   */
-  std::vector<int>
-  track_ids() const;
-
-  /**
-   * @brief
-   * get track points list from detection/segmentation/pose tasks.
-   *
-   * @return
-   * track points list.
-   *
-   * @note
-   * throw error if it's not a detection|segmentation|pose task.
-   */
-  std::vector<std::vector<cv::Point>>
-  track_points() const;
+  /* easy api for detection task. */
+  /********************************/
+  std::vector<cv::Rect>       boxes() const;
+  std::vector<int>            cls_ids() const;
+  std::vector<float>          confs() const;
+  std::vector<std::string>    labels() const;
+  std::vector<int>            track_ids() const;
+  std::vector<std::vector<cv::Point>> track_points() const;
 };
 
 } // namespace yolo

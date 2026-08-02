@@ -13,29 +13,13 @@ YoloResult::plot(const DrawParam& param) const -> cv::Mat
   {
     case YoloTaskType::CLS:
     {
-      auto top5_ = top5();
-      auto top5_confs_ = top5_confs();
-      auto top5_labels_ = top5_labels();
-
-      return draw_results(orig_image, param, top5_, top5_confs_, top5_labels_, std::vector<int>(), std::vector<float>(),
-                          std::vector<std::string>(), std::vector<cv::Rect>(), std::vector<cv::RotatedRect>(),
-                          std::vector<cv::Mat>(), std::vector<std::vector<cv::Point>>(),
-                          std::vector<std::vector<YoloKeyPoint>>(), std::vector<int>(),
-                          std::vector<std::vector<cv::Point>>());
+      return draw_results(orig_image, param, top5(), top5_confs(), top5_labels(),
+                          {}, {}, {}, {}, {}, {});
     }
     case YoloTaskType::DET:
     {
-      auto boxes_ = boxes();
-      auto cls_ids_ = cls_ids();
-      auto confs_ = confs();
-      auto labels_ = labels();
-      auto track_ids_ = track_ids();
-      auto track_points_ = track_points();
-
-      return draw_results(orig_image, param, std::vector<int>(), std::vector<float>(), std::vector<std::string>(),
-                          cls_ids_, confs_, labels_, boxes_, std::vector<cv::RotatedRect>(), std::vector<cv::Mat>(),
-                          std::vector<std::vector<cv::Point>>(), std::vector<std::vector<YoloKeyPoint>>(), track_ids_,
-                          track_points_);
+      return draw_results(orig_image, param, {}, {}, {},
+                          cls_ids(), confs(), labels(), boxes(), track_ids(), track_points());
     }
     default:
       throw std::runtime_error("invalid task type in YoloResult!");
@@ -289,91 +273,18 @@ YoloResult::boxes() const
     for (size_t i = 0; i < detections.size(); ++i)
       boxes.emplace_back(detections[i].box);
   }
-  else if (!segmentations.empty())
-  {
-    boxes.reserve(segmentations.size());
-    for (size_t i = 0; i < segmentations.size(); ++i)
-      boxes.emplace_back(segmentations[i].box);
-  }
-  else if (!poses.empty())
-  {
-    boxes.reserve(poses.size());
-    for (size_t i = 0; i < poses.size(); ++i)
-      boxes.emplace_back(poses[i].box);
-  }
-  else
-  {
-    // should NOT throw error,
-    // maybe just no structured results output from Yolo.
-  }
   return boxes;
-}
-
-std::vector<cv::RotatedRect>
-YoloResult::rboxes() const
-{
-  if (task != YoloTaskType::DET)
-  {
-    throw std::runtime_error("could not get rboxes from YoloResult, "
-                             "it's not a obb task.");
-  }
-
-  std::vector<cv::RotatedRect> rboxes;
-  if (!obbs.empty())
-  {
-    rboxes.reserve(obbs.size());
-    for (size_t i = 0; i < obbs.size(); ++i)
-      rboxes.emplace_back(obbs[i].rbox);
-  }
-  else
-  {
-    // should NOT throw error,
-    // maybe just no structured results output from Yolo.
-  }
-  return rboxes;
 }
 
 std::vector<int>
 YoloResult::cls_ids() const
 {
   if (task != YoloTaskType::DET)
-  {
-    throw std::runtime_error("could not get cls_ids from YoloResult, "
-                             "it's not a detection|segmentation|pose|obb task.");
-  }
+    throw std::runtime_error("could not get cls_ids from YoloResult: not a detection task.");
   std::vector<int> cls_ids;
-
-  // priority:
-  // detection->segmentation->pose->obb
-  if (!detections.empty())
-  {
-    cls_ids.reserve(detections.size());
-    for (size_t i = 0; i < detections.size(); ++i)
-      cls_ids.emplace_back(detections[i].cls_id);
-  }
-  else if (!segmentations.empty())
-  {
-    cls_ids.reserve(segmentations.size());
-    for (size_t i = 0; i < segmentations.size(); ++i)
-      cls_ids.emplace_back(segmentations[i].cls_id);
-  }
-  else if (!poses.empty())
-  {
-    cls_ids.reserve(poses.size());
-    for (size_t i = 0; i < poses.size(); ++i)
-      cls_ids.emplace_back(poses[i].cls_id);
-  }
-  else if (!obbs.empty())
-  {
-    cls_ids.reserve(obbs.size());
-    for (size_t i = 0; i < obbs.size(); ++i)
-      cls_ids.emplace_back(obbs[i].cls_id);
-  }
-  else
-  {
-    // should NOT throw error,
-    // maybe just no structured results output from Yolo.
-  }
+  cls_ids.reserve(detections.size());
+  for (const auto& d : detections)
+    cls_ids.emplace_back(d.cls_id);
   return cls_ids;
 }
 
@@ -381,43 +292,11 @@ std::vector<float>
 YoloResult::confs() const
 {
   if (task != YoloTaskType::DET)
-  {
-    throw std::runtime_error("could not get confs from YoloResult, "
-                             "it's not a detection|segmentation|pose|obb task.");
-  }
+    throw std::runtime_error("could not get confs from YoloResult: not a detection task.");
   std::vector<float> confs;
-
-  // priority:
-  // detection->segmentation->pose->obb
-  if (!detections.empty())
-  {
-    confs.reserve(detections.size());
-    for (size_t i = 0; i < detections.size(); ++i)
-      confs.emplace_back(detections[i].conf);
-  }
-  else if (!segmentations.empty())
-  {
-    confs.reserve(segmentations.size());
-    for (size_t i = 0; i < segmentations.size(); ++i)
-      confs.emplace_back(segmentations[i].conf);
-  }
-  else if (!poses.empty())
-  {
-    confs.reserve(poses.size());
-    for (size_t i = 0; i < poses.size(); ++i)
-      confs.emplace_back(poses[i].conf);
-  }
-  else if (!obbs.empty())
-  {
-    confs.reserve(obbs.size());
-    for (size_t i = 0; i < obbs.size(); ++i)
-      confs.emplace_back(obbs[i].conf);
-  }
-  else
-  {
-    // should NOT throw error,
-    // maybe just no structured results output from Yolo.
-  }
+  confs.reserve(detections.size());
+  for (const auto& d : detections)
+    confs.emplace_back(d.conf);
   return confs;
 }
 
@@ -425,153 +304,23 @@ std::vector<std::string>
 YoloResult::labels() const
 {
   if (task != YoloTaskType::DET)
-  {
-    throw std::runtime_error("could not get labels from YoloResult, "
-                             "it's not a detection|segmentation|pose|obb task.");
-  }
+    throw std::runtime_error("could not get labels from YoloResult: not a detection task.");
   std::vector<std::string> labels;
-
-  // priority:
-  // detection->segmentation->pose->obb
-  if (!detections.empty())
-  {
-    labels.reserve(detections.size());
-    for (size_t i = 0; i < detections.size(); ++i)
-      labels.emplace_back(detections[i].label);
-  }
-  else if (!segmentations.empty())
-  {
-    labels.reserve(segmentations.size());
-    for (size_t i = 0; i < segmentations.size(); ++i)
-      labels.emplace_back(segmentations[i].label);
-  }
-  else if (!poses.empty())
-  {
-    labels.reserve(poses.size());
-    for (size_t i = 0; i < poses.size(); ++i)
-      labels.emplace_back(poses[i].label);
-  }
-  else if (!obbs.empty())
-  {
-    labels.reserve(obbs.size());
-    for (size_t i = 0; i < obbs.size(); ++i)
-      labels.emplace_back(obbs[i].label);
-  }
-  else
-  {
-    // should NOT throw error,
-    // maybe just no structured results output from Yolo.
-  }
+  labels.reserve(detections.size());
+  for (const auto& d : detections)
+    labels.emplace_back(d.label);
   return labels;
-}
-
-std::vector<cv::Mat>
-YoloResult::masks() const
-{
-  if (task != YoloTaskType::DET)
-  {
-    throw std::runtime_error("could not get masks from YoloResult, "
-                             "it's not a segmentation task.");
-  }
-
-  std::vector<cv::Mat> masks;
-  if (!segmentations.empty())
-  {
-    masks.reserve(segmentations.size());
-    for (size_t i = 0; i < segmentations.size(); ++i)
-      masks.emplace_back(segmentations[i].mask);
-  }
-  else
-  {
-    // should NOT throw error,
-    // maybe just no structured results output from Yolo.
-  }
-  return masks;
-}
-
-std::vector<std::vector<cv::Point>>
-YoloResult::contours() const
-{
-  if (task != YoloTaskType::DET)
-  {
-    throw std::runtime_error("could not get contours from YoloResult, "
-                             "it's not a segmentation task.");
-  }
-
-  std::vector<std::vector<cv::Point>> contours;
-  if (!segmentations.empty())
-  {
-    contours.reserve(segmentations.size());
-    for (size_t i = 0; i < segmentations.size(); ++i)
-      contours.emplace_back(segmentations[i].contour);
-  }
-  else
-  {
-    // should NOT throw error,
-    // maybe just no structured results output from Yolo.
-  }
-  return contours;
-}
-
-std::vector<std::vector<YoloKeyPoint>>
-YoloResult::kpts() const
-{
-  if (task != YoloTaskType::DET)
-  {
-    throw std::runtime_error("could not get kpts from YoloResult, "
-                             "it's not a pose task.");
-  }
-
-  std::vector<std::vector<YoloKeyPoint>> kpts;
-  if (!poses.empty())
-  {
-    kpts.reserve(poses.size());
-    for (size_t i = 0; i < poses.size(); ++i)
-      kpts.emplace_back(poses[i].keypoints);
-  }
-  else
-  {
-    // should NOT throw error,
-    // maybe just no structured results output from Yolo.
-  }
-  return kpts;
 }
 
 std::vector<int>
 YoloResult::track_ids() const
 {
   if (task != YoloTaskType::DET)
-  {
-    throw std::runtime_error("could not get track ids from YoloResult, "
-                             "it's not a detection|segmentation|pose task.");
-  }
+    throw std::runtime_error("could not get track ids from YoloResult: not a detection task.");
   std::vector<int> track_ids;
-
-  // priority:
-  // detection->segmentation->pose
-  if (!detections.empty())
-  {
-    track_ids.reserve(detections.size());
-    for (size_t i = 0; i < detections.size(); ++i)
-      track_ids.emplace_back(detections[i].track_id);
-  }
-  else if (!segmentations.empty())
-  {
-    track_ids.reserve(segmentations.size());
-    for (size_t i = 0; i < segmentations.size(); ++i)
-      track_ids.emplace_back(segmentations[i].track_id);
-  }
-  else if (!poses.empty())
-  {
-    track_ids.reserve(poses.size());
-    for (size_t i = 0; i < poses.size(); ++i)
-      track_ids.emplace_back(poses[i].track_id);
-  }
-  else
-  {
-    // should NOT throw error,
-    // maybe just no structured results output from Yolo.
-  }
+  track_ids.reserve(detections.size());
+  for (const auto& d : detections)
+    track_ids.emplace_back(d.track_id);
   return track_ids;
 }
 
@@ -579,37 +328,11 @@ std::vector<std::vector<cv::Point>>
 YoloResult::track_points() const
 {
   if (task != YoloTaskType::DET)
-  {
-    throw std::runtime_error("could not get track points from YoloResult, "
-                             "it's not a detection|segmentation|pose task.");
-  }
+    throw std::runtime_error("could not get track points from YoloResult: not a detection task.");
   std::vector<std::vector<cv::Point>> track_points;
-
-  // priority:
-  // detection->segmentation->pose
-  if (!detections.empty())
-  {
-    track_points.reserve(detections.size());
-    for (size_t i = 0; i < detections.size(); ++i)
-      track_points.emplace_back(detections[i].track_points);
-  }
-  else if (!segmentations.empty())
-  {
-    track_points.reserve(segmentations.size());
-    for (size_t i = 0; i < segmentations.size(); ++i)
-      track_points.emplace_back(segmentations[i].track_points);
-  }
-  else if (!poses.empty())
-  {
-    track_points.reserve(poses.size());
-    for (size_t i = 0; i < poses.size(); ++i)
-      track_points.emplace_back(poses[i].track_points);
-  }
-  else
-  {
-    // should NOT throw error,
-    // maybe just no structured results output from Yolo.
-  }
+  track_points.reserve(detections.size());
+  for (const auto& d : detections)
+    track_points.emplace_back(d.track_points);
   return track_points;
 }
 

@@ -4,7 +4,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "nlohmann/json.hpp"
+#include <nlohmann/json.hpp>
 #include "YoloUtils.h"
 using json = nlohmann::json;
 

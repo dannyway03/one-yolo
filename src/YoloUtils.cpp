@@ -15,9 +15,7 @@ auto
 draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int>& top5,
              const std::vector<float>& top5_confs, const std::vector<std::string>& top5_labels,
              const std::vector<int>& cls_ids, const std::vector<float>& confs, const std::vector<std::string>& labels,
-             const std::vector<cv::Rect>& boxes, const std::vector<cv::RotatedRect>& rboxes,
-             const std::vector<cv::Mat>& masks, const std::vector<std::vector<cv::Point>>& contours,
-             const std::vector<std::vector<YoloKeyPoint>>& kpts, const std::vector<int>& track_ids,
+             const std::vector<cv::Rect>& boxes, const std::vector<int>& track_ids,
              const std::vector<std::vector<cv::Point>>& tracks) -> cv::Mat
 {
   auto canvas = image.clone();
@@ -88,120 +86,7 @@ draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int
     }
   }
 
-  // segmentation task
-  if (!contours.empty() && !masks.empty() && param.masks)
-  {
-    assert(boxes.size() == cls_ids.size());
-    assert(boxes.size() == confs.size());
-    assert(boxes.size() == labels.size());
-    assert(boxes.size() == masks.size());
-    assert(boxes.size() == contours.size());
-
-    // we use contours not use masks here
-    for (size_t i = 0; i < contours.size(); i++)
-    {
-      auto color = param.color_by_class ? colors[cls_ids[i] % colors_num] : colors[i % colors_num];
-
-      auto one_contour = contours[i];
-      // convert to local point
-      for (auto& p : one_contour)
-      {
-        p.x -= boxes[i].x;
-        p.y -= boxes[i].y;
-      }
-      float mask_alpha = std::max(0.0f, std::min(1.0f, param.mask_alpha));
-      cv::Mat roi = canvas(boxes[i]); // reference
-      cv::Mat overlay = roi.clone();
-      // fill contour
-      cv::drawContours(overlay, std::vector<std::vector<cv::Point>>{one_contour}, -1, color, cv::FILLED);
-
-      // roi = mask_alpha * overlay + (1.0 - mask_alpha) * roi
-      cv::addWeighted(overlay, mask_alpha, roi, 1.0f - mask_alpha, 0.0, roi, -1);
-      // draw contour
-      if (param.mask_line_width > 0)
-        cv::drawContours(roi, std::vector<std::vector<cv::Point>>{one_contour}, -1, color, param.mask_line_width);
-    }
-
-    /*
-    for (size_t i = 0; i < masks.size(); i++) {
-        auto color = param.color_by_class ? colors[cls_ids[i] % colors_num] : colors[i % colors_num];
-
-        // binary mask (0 background / 255 object), has the same size as bbox
-        auto& mask = masks[i];
-
-        float mask_alpha = std::max(0.0f, std::min(1.0f, param.mask_alpha));
-        cv::Mat roi = canvas(boxes[i]);  // reference
-        cv::Mat color_mat(roi.size(), roi.type(), color);
-
-        // blended = mask_alpha * color_mat + (1.0 - mask_alpha) * roi
-        cv::Mat blended;
-        cv::addWeighted(color_mat, mask_alpha,
-                        roi,       1.0f - mask_alpha,
-                        0.0,
-                        blended,
-                        -1);
-
-        // draw contour of mask
-        if (param.mask_line_width > 0) {
-            std::vector<cv::Mat> contours;
-            cv::Mat hierarchy;
-            cv::findContours(mask, contours, hierarchy, cv::RETR_CCOMP, cv::CHAIN_APPROX_SIMPLE);
-            cv::drawContours(blended, contours, -1, color, param.mask_line_width, cv::LINE_AA, hierarchy, 100);
-        }
-        blended.copyTo(roi, mask);
-    }*/
-  }
-
-  // pose task
-  if (!kpts.empty() && param.kpts)
-  {
-    assert(boxes.size() == cls_ids.size());
-    assert(boxes.size() == confs.size());
-    assert(boxes.size() == labels.size());
-    assert(boxes.size() == kpts.size());
-
-    for (size_t i = 0; i < kpts.size(); i++)
-    {
-      auto& one_kpts = kpts[i];
-
-      // draw link lines between points
-      if (param.kpt_line_width > 0)
-      {
-        // make sure each line part has itself color
-        assert(param.kpt_pairs.size() == param.kpt_pair_colors.size());
-
-        for (size_t j = 0; j < param.kpt_pairs.size(); j++)
-        {
-          auto pair_indices = param.kpt_pairs[j];
-          auto pair_color = param.kpt_pair_colors[j];
-
-          // conf of keypoint meet the threshold
-          if (one_kpts[pair_indices.first].conf >= 0.5 && one_kpts[pair_indices.second].conf >= 0.5)
-          {
-            auto p1 = cv::Point(one_kpts[pair_indices.first].x, one_kpts[pair_indices.first].y);
-            auto p2 = cv::Point(one_kpts[pair_indices.second].x, one_kpts[pair_indices.second].y);
-            cv::line(canvas, p1, p2, pair_color, param.kpt_line_width, cv::LINE_AA);
-          }
-        }
-      }
-
-      // draw points
-      if (param.kpt_radius > 0)
-      {
-        auto color = param.color_by_class ? colors[cls_ids[i] % colors_num] : colors[i % colors_num];
-        for (auto one_kpt : one_kpts)
-        {
-          if (one_kpt.conf >= 0.5)
-          {
-            auto p = cv::Point(one_kpt.x, one_kpt.y);
-            cv::circle(canvas, p, param.kpt_radius, color, -1); // fill
-          }
-        }
-      }
-    }
-  }
-
-  // detection/segmentation/pose tasks
+  // detection task
   if (!boxes.empty() && param.boxes && param.box_line_width > 0)
   {
     assert(boxes.size() == cls_ids.size());
@@ -240,53 +125,6 @@ draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int
         cv::putText(canvas, txt,
                     cv::Point(boxes[i].x - font_offset_x + font_padding, boxes[i].y - baseline - font_padding),
                     font_face, font_scale, font_color, font_thickness);
-      }
-    }
-  }
-
-  // obb task
-  if (!rboxes.empty() && param.rboxes && param.rbox_line_width > 0)
-  {
-    assert(rboxes.size() == cls_ids.size());
-    assert(rboxes.size() == confs.size());
-    assert(rboxes.size() == labels.size());
-
-    for (size_t i = 0; i < rboxes.size(); i++)
-    {
-      auto color = param.color_by_class ? colors[cls_ids[i] % colors_num] : colors[i % colors_num];
-
-      // find 4 vertices for rotated rect first and then draw polylines
-      std::vector<cv::Point2f> vertices_f;
-      rboxes[i].points(vertices_f);
-      std::vector<cv::Point> i_vertices;
-      i_vertices.reserve(4);
-      for (int i = 0; i < 4; i++)
-        i_vertices.emplace_back(cvRound(vertices_f[i].x), cvRound(vertices_f[i].y));
-      cv::polylines(canvas, i_vertices, true, color, param.rbox_line_width, cv::LINE_AA);
-
-      std::string txt;
-      if (param.cls_ids)
-        txt += std::to_string(cls_ids[i]);
-      if (param.labels)
-        txt += (!txt.empty() ? ", " : "") + labels[i];
-      if (param.confs)
-        txt += (!txt.empty() ? ", " : "") + to_string(confs[i] * 100) + "%";
-
-      // draw text
-      if (!txt.empty())
-      {
-        // calculate rectangle of txt
-        auto baseline = 0;
-        auto txt_size = cv::getTextSize(txt, font_face, font_scale, font_thickness, &baseline);
-        cv::rectangle(canvas,
-                      cv::Rect(i_vertices[1].x - font_offset_x,
-                               i_vertices[1].y - txt_size.height - baseline - font_padding * 2,
-                               txt_size.width + font_padding * 2, txt_size.height + baseline + font_padding * 2),
-                      color, -1); // fill
-        cv::putText(
-          canvas, txt,
-          cv::Point(i_vertices[1].x - font_offset_x + font_padding, i_vertices[1].y - baseline - font_padding),
-          font_face, font_scale, font_color, font_thickness);
       }
     }
   }
@@ -483,37 +321,5 @@ YoloUtils::decode_box(float cx, float cy, float w, float h, const LetterBoxInfo&
   return {(int)x1, (int)y1, (int)(x2 - x1), (int)(y2 - y1)};
 }
 
-auto
-YoloUtils::decode_keypoint(float x, float y, float conf, const LetterBoxInfo& lb, const cv::Size& orig_size)
-  -> YoloKeyPoint
-{
-  x = (x - lb.pad_w) / lb.scale;
-  y = (y - lb.pad_h) / lb.scale;
-
-  x = std::clamp(x, 0.f, (float)orig_size.width - 1.f);
-  y = std::clamp(y, 0.f, (float)orig_size.height - 1.f);
-
-  return YoloKeyPoint{x, y, conf};
-}
-
-auto
-YoloUtils::decode_rbox(float cx, float cy, float w, float h, float angle, const LetterBoxInfo& lb,
-                       const cv::Size& orig_size) -> cv::RotatedRect
-{
-  cx = (cx - lb.pad_w) / lb.scale;
-  cy = (cy - lb.pad_h) / lb.scale;
-
-  w = w / lb.scale;
-  h = h / lb.scale;
-
-  cx = std::clamp(cx, 0.f, (float)orig_size.width - 1.f);
-  cy = std::clamp(cy, 0.f, (float)orig_size.height - 1.f);
-
-  w = std::clamp(w, 0.f, (float)orig_size.width - 1.f);
-  h = std::clamp(h, 0.f, (float)orig_size.height - 1.f);
-
-  float angle_deg = angle * 180.0f / CV_PI;
-  return {cv::Point(cx, cy), cv::Size(w, h), angle_deg};
-}
 
 } // namespace yolo

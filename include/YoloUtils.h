@@ -54,9 +54,7 @@ cv::Mat
 draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int>& top5,
              const std::vector<float>& top5_confs, const std::vector<std::string>& top5_labels,
              const std::vector<int>& cls_ids, const std::vector<float>& confs, const std::vector<std::string>& labels,
-             const std::vector<cv::Rect>& boxes, const std::vector<cv::RotatedRect>& rboxes,
-             const std::vector<cv::Mat>& masks, const std::vector<std::vector<cv::Point>>& contours,
-             const std::vector<std::vector<YoloKeyPoint>>& kpts, const std::vector<int>& track_ids,
+             const std::vector<cv::Rect>& boxes, const std::vector<int>& track_ids,
              const std::vector<std::vector<cv::Point>>& tracks);
 
 class YoloUtils
@@ -78,10 +76,6 @@ public:
                   const std::vector<int>& cls_ids, float conf_thresh, float nms_thresh, std::vector<int>& keep_indices);
   cv::Rect
   decode_box(float cx, float cy, float w, float h, const LetterBoxInfo& lb, const cv::Size& orig_size);
-  YoloKeyPoint
-  decode_keypoint(float x, float y, float conf, const LetterBoxInfo& lb, const cv::Size& orig_size);
-  cv::RotatedRect
-  decode_rbox(float cx, float cy, float w, float h, float angle, const LetterBoxInfo& lb, const cv::Size& orig_size);
 };
 
 } // namespace yolo
