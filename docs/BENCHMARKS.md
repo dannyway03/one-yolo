@@ -15,14 +15,15 @@ for every supported detector/backend combination.
 
 ## Executive Snapshot — 2026-08-02
 
-Best results to date: **session 2026-08-02c** (ORT cached names/MemoryInfo) for ORT · **2026-08-02b** for OVN.  
-OVN timing baseline: commit **1f48441** · PXL image.  
+Best results to date: **2026-08-02d** (OVN GPU) for OVN GPU · **2026-08-02c** (ORT name cache) for ORT.  
+OVN timing baseline: commit **1f48441** · PXL image (CPU).  
 ORT timing baseline: commit **5416363** · MOT17-02 frame 1.  
-Accuracy baseline (both backends): MOT17-02 frame 1, first run — 22 GT pedestrians.
+Accuracy baseline: MOT17-02 frame 1 · 22 GT pedestrians.  
+Platform: Intel i7-8665U · Intel UHD 620 (iGPU) · NVIDIA MX250.
 
 ### Timing — best vs baseline (avg · 50 iter · 640 × 384 · MOT17-02/000001.jpg)
 
-#### OVN CPU
+#### OVN CPU (FP32)
 
 | Model | pre | infer | post | **total** | **FPS** | Δ total vs OVN baseline ¹ | Δ FPS |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -31,6 +32,14 @@ Accuracy baseline (both backends): MOT17-02 frame 1, first run — 22 GT pedestr
 | bytetrack\_nano\_dec | 3.50 | 14.67 | 0.12 | **18.29** | **54.7** | *(no baseline — IR added 2026-08-02a)* | — |
 
 ¹ OVN baseline used a different image (PXL); Δ conflates image-switch and code change. Within-session noise ±1 ms.
+
+#### OVN GPU — Intel UHD 620 (FP16 via ovc default compression)
+
+| Model | pre | infer | post | **total** | **FPS** | Δ vs OVN CPU | Δ FPS |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| yolo26n | 2.89 | 23.58 | 0.04 | **26.51** | **37.7** | +0.30 ms (parity) | -0.5 |
+| yolox\_nano\_dec | 3.45 | 12.56 | 0.20 | **16.01** | **62.5** | **-4.61 ms** | **+14.0** |
+| bytetrack\_nano\_dec | 3.39 | 11.60 | 0.12 | **15.11** | **66.2** | **-3.18 ms** | **+11.5** |
 
 #### ORT CPU
 
@@ -44,12 +53,15 @@ Accuracy baseline (both backends): MOT17-02 frame 1, first run — 22 GT pedestr
 
 | Model | Backend | Detections | Recall proxy | Notes |
 |---|---|---|---|---|
-| yolo26n | OVN CPU | 7 | 31.8 % | nano model at 640×384 vs 1920×1080 source |
-| yolox\_nano\_dec | OVN CPU | 14 | 63.6 % | conf=0.25 |
-| bytetrack\_nano\_dec | OVN CPU | 12 | 54.5 % | 1 class (person) |
-| yolo26n | ORT CPU | 7 | 31.8 % | ✓ same as OVN |
-| yolox\_nano\_dec | ORT CPU | 14 | 63.6 % | ✓ same as OVN |
-| bytetrack\_nano\_dec | ORT CPU | 12 | 54.5 % | ✓ same as OVN |
+| yolo26n | OVN CPU | 7 | 31.8 % | FP32 |
+| yolox\_nano\_dec | OVN CPU | 14 | 63.6 % | FP32 |
+| bytetrack\_nano\_dec | OVN CPU | 12 | 54.5 % | FP32 |
+| yolo26n | OVN GPU | 6 | 27.3 % | FP16 (ovc default); -1 det vs CPU |
+| yolox\_nano\_dec | OVN GPU | 13 | 59.1 % | FP16; -1 det vs CPU |
+| bytetrack\_nano\_dec | OVN GPU | 12 | 54.5 % | FP16 ✓ same as CPU |
+| yolo26n | ORT CPU | 7 | 31.8 % | ✓ same as OVN CPU |
+| yolox\_nano\_dec | ORT CPU | 14 | 63.6 % | ✓ same as OVN CPU |
+| bytetrack\_nano\_dec | ORT CPU | 12 | 54.5 % | ✓ same as OVN CPU |
 
 > Recall proxy = detected / GT count. Not true AP (no IoU matching). Full mAP not yet automated.
 
@@ -196,6 +208,50 @@ awk -F',' '$1==1 && $7==1 && $8==1 {count++} END{print count}' \
 ---
 
 ## Sessions Log
+
+---
+
+### 2026-08-02d — OVN GPU (Intel UHD 620) + double-buffer pipeline API
+
+**Branch / commit**: `develop` · `ab543db`
+
+**Changes**
+- `YoloOVNRT`: double-buffer pipeline API — `submit()` + `collect()` for GPU/NPU callers
+  - `infer_req_[1]` created lazily on first `submit()` — `inference()` callers pay zero overhead
+  - `inference()` always uses `infer_req_[0]` directly (fast blocking path, no L3 thrash)
+  - Eager dual-request allocation regressed CPU ~2× (L3 thrash from doubled weight footprint); lazy init avoids this
+- **Intel UHD 620 iGPU confirmed** via `ov::Core().available_devices` + `clinfo`; ACL grants access without group change
+
+**Timing (MOT17-02/000001.jpg · OVN GPU FP16 · 50 iter)**
+
+| Model | pre | infer | post | **total** | **FPS** | Δ vs OVN CPU |
+|---|---:|---:|---:|---:|---:|---:|
+| yolo26n | 2.89 ms | 23.58 ms | 0.04 ms | **26.51 ms** | **37.7** | +0.30 ms (parity) |
+| yolox\_nano\_dec | 3.45 ms | 12.56 ms | 0.20 ms | **16.01 ms** | **62.5** | **-4.61 ms / +14 FPS** |
+| bytetrack\_nano\_dec | 3.39 ms | 11.60 ms | 0.12 ms | **15.11 ms** | **66.2** | **-3.18 ms / +11.5 FPS** |
+
+**Accuracy (MOT17-02 frame 1, GT = 22 pedestrians · FP16 vs FP32)**
+
+| Model | Det CPU (FP32) | Det GPU (FP16) | Δ | Recall GPU |
+|---|---|---|---|---|
+| yolo26n | 7 | 6 | -1 | 27.3 % |
+| yolox\_nano\_dec | 14 | 13 | -1 | 59.1 % |
+| bytetrack\_nano\_dec | 12 | 12 | 0 ✓ | 54.5 % |
+
+**Analysis**
+
+UHD 620 wins on yx (+29% FPS) and bt (+21% FPS). y26 is at parity — the model is small enough
+that data transfer overhead (CPU↔GPU via shared memory bus) eats the compute gain.
+FP16 compression by `ovc` reduces recall by 1 detection on y26 and yx; bt is unaffected.
+To recover FP32 accuracy on GPU, re-convert with `ovc --compress_to_fp16 False`.
+
+`submit/collect` pipeline benefit on GPU: with `inference()` the CPU blocks in `wait()`.
+With `submit(blob_N); preprocess(blob_N1); collect()` the GPU runs blob_N while the CPU
+prepares blob_N+1 — effective GPU utilisation increases, further improving throughput
+beyond the numbers shown here (which use the blocking `inference()` path in bench).
+
+**Next**: re-convert IR with `--compress_to_fp16 False` and re-bench GPU FP32; measure
+`submit/collect` pipeline throughput vs `inference()` on GPU.
 
 ---
 
