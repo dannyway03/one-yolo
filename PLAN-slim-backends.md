@@ -233,7 +233,44 @@ In `resolveRuntime()`, remove the `dnn` branch:
 
 ---
 
-### 1-J  Build check (Phase 1)
+### 1-J  Purge dead enum references in remaining sources (APPROVED EXTENSION)
+
+> **Why this step exists**: after 1-D trims the enums, the build (gate 1-K) fails because
+> `src/YoloConfig.cpp`, `src/YoloResult.cpp`, `src/track/YoloTracker.cpp`, and `tools/bench.cpp`
+> still reference the removed enumerators (`SEG/POSE/OBB`, `OPENCV_CPU/OPENCV_CUDA`, `TRT`, `RKNN`).
+> These files are not in the original Phase 1 edit list, so this step was added with explicit
+> user approval. It is a **minimal dead-reference purge only** — no reorganisation, no renaming,
+> no behaviour change. `tools/bench.cpp` keeps its model flags until Phase 2.
+
+**1-J-1  `src/YoloConfig.cpp`** — remove dead switch cases:
+- In `toString(YoloTaskType)`: remove the `SEG`, `POSE`, `OBB` cases.
+- In `toString(YoloTargetRT)`: remove the `OPENCV_CPU`, `OPENCV_CUDA`, `TRT`, `RKNN` cases.
+
+**1-J-2  `src/YoloResult.cpp`** — remove dead task branches and guards:
+- In `plot()`: remove the `SEG`, `POSE`, `OBB` cases.
+- In `to_csv()`: remove the `SEG`, `POSE`, `OBB` cases.
+- In `to_json()`: remove the `SEG`, `POSE`, `OBB` cases.
+- In `info()`: remove the `else if (task == YoloTaskType::OBB)` branch.
+- In `boxes()`, `cls_ids()`, `confs()`, `labels()`, `track_ids()`, `track_points()`: trim the
+  guard condition to `task != YoloTaskType::DET` only.
+- In `rboxes()`, `masks()`, `contours()`, `kpts()`: change the guard to `task != YoloTaskType::DET`
+  (these accessors are now unreachable for their original tasks but must still compile).
+
+**1-J-3  `src/track/YoloTracker.cpp`** — remove dead task branches (SEG/POSE).
+
+**1-J-4  `tools/bench.cpp`** — remove dead enum references only:
+- Remove `OPENCV_CPU`/`OPENCV_CUDA` from the runtime resolver and `SEG`/`POSE`/`OBB` from the
+  task resolver. Keep all model flags (`--model`, `--version`, etc.) — those are removed in Phase 2.
+
+**Gate 1-J**: `grep -rn "YoloTaskType::SEG\|YoloTaskType::POSE\|YoloTaskType::OBB\|YoloTargetRT::OPENCV\|YoloTargetRT::TRT\|YoloTargetRT::RKNN" src/` → 0 lines.
+
+---
+
+### 1-K  Build check (Phase 1)
+
+> The project uses CMake presets (`CMakePresets.json`). The plan's literal `cmake -B build` fails
+> because it omits the preset cache variables (`OpenCV_DIR`, `onnxruntime_DIR`, `OpenVINO_DIR`).
+> Use the `Release` preset; binaries land under `build/Release/`.
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release

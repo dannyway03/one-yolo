@@ -37,47 +37,6 @@ YoloResult::plot(const DrawParam& param) const -> cv::Mat
                           std::vector<std::vector<cv::Point>>(), std::vector<std::vector<YoloKeyPoint>>(), track_ids_,
                           track_points_);
     }
-    case YoloTaskType::SEG:
-    {
-      auto boxes_ = boxes();
-      auto cls_ids_ = cls_ids();
-      auto confs_ = confs();
-      auto labels_ = labels();
-      auto masks_ = masks();
-      auto contours_ = contours();
-      auto track_ids_ = track_ids();
-      auto track_points_ = track_points();
-
-      return draw_results(orig_image, param, std::vector<int>(), std::vector<float>(), std::vector<std::string>(),
-                          cls_ids_, confs_, labels_, boxes_, std::vector<cv::RotatedRect>(), masks_, contours_,
-                          std::vector<std::vector<YoloKeyPoint>>(), track_ids_, track_points_);
-    }
-    case YoloTaskType::POSE:
-    {
-      auto boxes_ = boxes();
-      auto cls_ids_ = cls_ids();
-      auto confs_ = confs();
-      auto labels_ = labels();
-      auto kpts_ = kpts();
-      auto track_ids_ = track_ids();
-      auto track_points_ = track_points();
-
-      return draw_results(orig_image, param, std::vector<int>(), std::vector<float>(), std::vector<std::string>(),
-                          cls_ids_, confs_, labels_, boxes_, std::vector<cv::RotatedRect>(), std::vector<cv::Mat>(),
-                          std::vector<std::vector<cv::Point>>(), kpts_, track_ids_, track_points_);
-    }
-    case YoloTaskType::OBB:
-    {
-      auto rboxes_ = rboxes();
-      auto cls_ids_ = cls_ids();
-      auto confs_ = confs();
-      auto labels_ = labels();
-
-      return draw_results(orig_image, param, std::vector<int>(), std::vector<float>(), std::vector<std::string>(),
-                          cls_ids_, confs_, labels_, std::vector<cv::Rect>(), rboxes_, std::vector<cv::Mat>(),
-                          std::vector<std::vector<cv::Point>>(), std::vector<std::vector<YoloKeyPoint>>(),
-                          std::vector<int>(), std::vector<std::vector<cv::Point>>());
-    }
     default:
       throw std::runtime_error("invalid task type in YoloResult!");
       break;
@@ -149,42 +108,6 @@ YoloResult::to_csv(bool print)
       }
       break;
     }
-    case YoloTaskType::SEG:
-    {
-      oss << "id,cls_id,conf,label,track_id" << std::endl;
-      for (size_t i = 0; i < segmentations.size(); i++)
-      {
-        auto& obj = segmentations[i];
-        oss << (i + 1) << "," << obj.cls_id << "," << obj.conf << "," << obj.label << "," << obj.track_id;
-        if (i + 1 != segmentations.size())
-          oss << std::endl;
-      }
-      break;
-    }
-    case YoloTaskType::POSE:
-    {
-      oss << "id,cls_id,conf,label,track_id" << std::endl;
-      for (size_t i = 0; i < poses.size(); i++)
-      {
-        auto& obj = poses[i];
-        oss << (i + 1) << "," << obj.cls_id << "," << obj.conf << "," << obj.label << "," << obj.track_id;
-        if (i + 1 != poses.size())
-          oss << std::endl;
-      }
-      break;
-    }
-    case YoloTaskType::OBB:
-    {
-      oss << "id,cls_id,conf,label" << std::endl;
-      for (size_t i = 0; i < obbs.size(); i++)
-      {
-        auto& obj = obbs[i];
-        oss << (i + 1) << "," << obj.cls_id << "," << obj.conf << "," << obj.label;
-        if (i + 1 != obbs.size())
-          oss << std::endl;
-      }
-      break;
-    }
     default:
       throw std::runtime_error("invalid task type in YoloResult!");
       break;
@@ -212,24 +135,6 @@ YoloResult::to_json(bool print, bool indent)
     case YoloTaskType::DET:
     {
       json j = detections;
-      j_str = j.dump(indent_num);
-      break;
-    }
-    case YoloTaskType::SEG:
-    {
-      json j = segmentations;
-      j_str = j.dump(indent_num);
-      break;
-    }
-    case YoloTaskType::POSE:
-    {
-      json j = poses;
-      j_str = j.dump(indent_num);
-      break;
-    }
-    case YoloTaskType::OBB:
-    {
-      json j = obbs;
       j_str = j.dump(indent_num);
       break;
     }
@@ -272,11 +177,6 @@ YoloResult::info(bool print)
     for (size_t i = 1; i < t5_labels.size(); i++)
       t5_out += ", " + t5_labels[i] + "(" + std::to_string(t5_confs[i]) + ")";
     oss << "top5              : " << t5_out;
-  }
-  else if (task == YoloTaskType::OBB)
-  {
-    // number of rboxes, which stand for the number of predicted objects.
-    oss << "objects count     : " << rboxes().size();
   }
   else
   {
@@ -374,7 +274,7 @@ YoloResult::top5_labels() const
 std::vector<cv::Rect>
 YoloResult::boxes() const
 {
-  if (task != YoloTaskType::DET && task != YoloTaskType::SEG && task != YoloTaskType::POSE)
+  if (task != YoloTaskType::DET)
   {
     throw std::runtime_error("could not get boxes from YoloResult, "
                              "it's not a detection|segmentation|pose task.");
@@ -412,7 +312,7 @@ YoloResult::boxes() const
 std::vector<cv::RotatedRect>
 YoloResult::rboxes() const
 {
-  if (task != YoloTaskType::OBB)
+  if (task != YoloTaskType::DET)
   {
     throw std::runtime_error("could not get rboxes from YoloResult, "
                              "it's not a obb task.");
@@ -436,7 +336,7 @@ YoloResult::rboxes() const
 std::vector<int>
 YoloResult::cls_ids() const
 {
-  if (task != YoloTaskType::DET && task != YoloTaskType::SEG && task != YoloTaskType::POSE && task != YoloTaskType::OBB)
+  if (task != YoloTaskType::DET)
   {
     throw std::runtime_error("could not get cls_ids from YoloResult, "
                              "it's not a detection|segmentation|pose|obb task.");
@@ -480,7 +380,7 @@ YoloResult::cls_ids() const
 std::vector<float>
 YoloResult::confs() const
 {
-  if (task != YoloTaskType::DET && task != YoloTaskType::SEG && task != YoloTaskType::POSE && task != YoloTaskType::OBB)
+  if (task != YoloTaskType::DET)
   {
     throw std::runtime_error("could not get confs from YoloResult, "
                              "it's not a detection|segmentation|pose|obb task.");
@@ -524,7 +424,7 @@ YoloResult::confs() const
 std::vector<std::string>
 YoloResult::labels() const
 {
-  if (task != YoloTaskType::DET && task != YoloTaskType::SEG && task != YoloTaskType::POSE && task != YoloTaskType::OBB)
+  if (task != YoloTaskType::DET)
   {
     throw std::runtime_error("could not get labels from YoloResult, "
                              "it's not a detection|segmentation|pose|obb task.");
@@ -568,7 +468,7 @@ YoloResult::labels() const
 std::vector<cv::Mat>
 YoloResult::masks() const
 {
-  if (task != YoloTaskType::SEG)
+  if (task != YoloTaskType::DET)
   {
     throw std::runtime_error("could not get masks from YoloResult, "
                              "it's not a segmentation task.");
@@ -592,7 +492,7 @@ YoloResult::masks() const
 std::vector<std::vector<cv::Point>>
 YoloResult::contours() const
 {
-  if (task != YoloTaskType::SEG)
+  if (task != YoloTaskType::DET)
   {
     throw std::runtime_error("could not get contours from YoloResult, "
                              "it's not a segmentation task.");
@@ -616,7 +516,7 @@ YoloResult::contours() const
 std::vector<std::vector<YoloKeyPoint>>
 YoloResult::kpts() const
 {
-  if (task != YoloTaskType::POSE)
+  if (task != YoloTaskType::DET)
   {
     throw std::runtime_error("could not get kpts from YoloResult, "
                              "it's not a pose task.");
@@ -640,7 +540,7 @@ YoloResult::kpts() const
 std::vector<int>
 YoloResult::track_ids() const
 {
-  if (task != YoloTaskType::DET && task != YoloTaskType::SEG && task != YoloTaskType::POSE)
+  if (task != YoloTaskType::DET)
   {
     throw std::runtime_error("could not get track ids from YoloResult, "
                              "it's not a detection|segmentation|pose task.");
@@ -678,7 +578,7 @@ YoloResult::track_ids() const
 std::vector<std::vector<cv::Point>>
 YoloResult::track_points() const
 {
-  if (task != YoloTaskType::DET && task != YoloTaskType::SEG && task != YoloTaskType::POSE)
+  if (task != YoloTaskType::DET)
   {
     throw std::runtime_error("could not get track points from YoloResult, "
                              "it's not a detection|segmentation|pose task.");

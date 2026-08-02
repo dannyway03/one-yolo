@@ -4,9 +4,6 @@
 
 #include "YoloClsTask.h"
 #include "YoloDetTask.h"
-#include "YoloObbTask.h"
-#include "YoloPoseTask.h"
-#include "YoloSegTask.h"
 
 namespace yolo {
 
@@ -22,15 +19,6 @@ Yolo::Yolo(const YoloConfig& cfg) : cfg_(cfg)
       break;
     case YoloTaskType::DET:
       task_ = std::make_shared<yolo::YoloDetTask>(cfg);
-      break;
-    case YoloTaskType::SEG:
-      task_ = std::make_shared<yolo::YoloSegTask>(cfg);
-      break;
-    case YoloTaskType::POSE:
-      task_ = std::make_shared<yolo::YoloPoseTask>(cfg);
-      break;
-    case YoloTaskType::OBB:
-      task_ = std::make_shared<yolo::YoloObbTask>(cfg);
       break;
     default:
       throw std::invalid_argument("invalid YoloTaskType parameter when initializing Yolo!");

@@ -104,8 +104,6 @@ resolveRuntime(const std::string& backend, const std::string& device) -> yolo::Y
       return yolo::YoloTargetRT::OVN_AUTO;
     return yolo::YoloTargetRT::OVN_CPU;
   }
-  if (backend == "dnn")
-    return (device == "cuda") ? yolo::YoloTargetRT::OPENCV_CUDA : yolo::YoloTargetRT::OPENCV_CPU;
   throw std::runtime_error("unknown --backend: " + backend);
 }
 

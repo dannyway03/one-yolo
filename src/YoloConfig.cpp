@@ -17,12 +17,6 @@ toString(YoloTaskType task) -> std::string
       return "classification";
     case YoloTaskType::DET:
       return "detection";
-    case YoloTaskType::SEG:
-      return "segmentation";
-    case YoloTaskType::POSE:
-      return "pose";
-    case YoloTaskType::OBB:
-      return "obb";
     default:
       return "unknown";
   }
@@ -53,10 +47,6 @@ toString(YoloTargetRT target_rt) -> std::string
 {
   switch (target_rt)
   {
-    case YoloTargetRT::OPENCV_CPU:
-      return "opencv::dnn(cpu)";
-    case YoloTargetRT::OPENCV_CUDA:
-      return "opencv::dnn(cuda)";
     case YoloTargetRT::ORT_CPU:
       return "onnxruntime(cpu)";
     case YoloTargetRT::ORT_CUDA:
@@ -67,10 +57,6 @@ toString(YoloTargetRT target_rt) -> std::string
       return "openvino(cpu)";
     case YoloTargetRT::OVN_GPU:
       return "openvino(integrated gpu)";
-    case YoloTargetRT::TRT:
-      return "tensorrt";
-    case YoloTargetRT::RKNN:
-      return "rknn";
     default:
       return "unknown";
   }

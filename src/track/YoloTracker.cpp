@@ -119,18 +119,6 @@ YoloTracker::postprocess(const std::vector<cv::Rect>& boxes, const std::vector<s
         res.detections[i].track_points = tracking_points_[track_id];
         break;
       }
-      case YoloTaskType::SEG:
-      {
-        res.segmentations[i].track_id = track_id;
-        res.segmentations[i].track_points = tracking_points_[track_id];
-        break;
-      }
-      case YoloTaskType::POSE:
-      {
-        res.poses[i].track_id = track_id;
-        res.poses[i].track_points = tracking_points_[track_id];
-        break;
-      }
       default:
         throw std::runtime_error("got unsupported YoloTaskType when calling YoloTracker::postprocess()!");
         break;
@@ -161,7 +149,7 @@ YoloTracker::postprocess(const std::vector<cv::Rect>& boxes, const std::vector<s
 void
 YoloTracker::track(YoloResult& res)
 {
-  if (res.task != YoloTaskType::DET && res.task != YoloTaskType::SEG && res.task != YoloTaskType::POSE)
+  if (res.task != YoloTaskType::DET)
   {
     throw std::runtime_error("got unsupported task type when calling YoloTracker::track()!");
     return;

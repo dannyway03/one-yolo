@@ -5,18 +5,11 @@
 #include <stdexcept>
 #include <utility>
 
-#include "YoloOpenCVRT.h"
 #ifdef BUILD_WITH_ORT
   #include "ort/YoloONNXRT.h"
 #endif
 #ifdef BUILD_WITH_OVN
   #include "ovn/YoloOVNRT.h"
-#endif
-#ifdef BUILD_WITH_TRT
-  #include "trt/YoloTRT.h"
-#endif
-#ifdef BUILD_WITH_RKN
-  #include "rkn/YoloRKNNRT.h"
 #endif
 namespace yolo {
 
@@ -24,12 +17,6 @@ YoloTask::YoloTask(YoloConfig cfg) : _cfg(std::move(cfg))
 {
   switch (_cfg.target_rt_)
   {
-    case YoloTargetRT::OPENCV_CPU:
-      _rt = std::make_shared<yolo::YoloOpenCVRT>(_cfg.model_path_, false);
-      break;
-    case YoloTargetRT::OPENCV_CUDA:
-      _rt = std::make_shared<yolo::YoloOpenCVRT>(_cfg.model_path_, true);
-      break;
 #ifdef BUILD_WITH_ORT
     case YoloTargetRT::ORT_CPU:
       _rt = std::make_shared<yolo::YoloONNXRT>(_cfg.model_path_, false);
@@ -47,16 +34,6 @@ YoloTask::YoloTask(YoloConfig cfg) : _cfg(std::move(cfg))
       break;
     case YoloTargetRT::OVN_GPU:
       _rt = std::make_shared<yolo::YoloOVNRT>(_cfg.model_path_, "GPU");
-      break;
-#endif
-#ifdef BUILD_WITH_TRT
-    case YoloTargetRT::TRT:
-      _rt = std::make_shared<yolo::YoloTRT>(_cfg.model_path_);
-      break;
-#endif
-#ifdef BUILD_WITH_RKN
-    case YoloTargetRT::RKNN:
-      _rt = std::make_shared<yolo::YoloRKNNRT>(_cfg.model_path_);
       break;
 #endif
     default:

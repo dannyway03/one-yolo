@@ -15,8 +15,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fPIC -w -fdiagnostics-color=always -
 
 option(BUILD_WITH_ORT "enable ONNXRuntime" ON)
 option(BUILD_WITH_OVN "enable OpenVINO(Intel Platform)" ON)
-#option(BUILD_WITH_TRT "enable TensorRT(Nvidia/CUDA Platform)?" OFF)
-#option(BUILD_WITH_RKN "enable RKNN(RockChip Platform)?" OFF)
 #option(BUILD_WITH_CML "enable CoreML(Apple Platform)?" OFF)
 #option(BUILD_WITH_PDL "enable PaddlePaddle?" OFF)
 #option(BUILD_WITH_CAN "enable CANN(HuaWei Platform)?" OFF)
@@ -36,12 +34,9 @@ include_directories("include")
 # build one-yolo library #
 ##########################
 file(GLOB BASE_SRCS "src/*.cpp")
-file(GLOB_RECURSE TRACK_SRCS "src/track/*.cpp")
 file(GLOB_RECURSE ORT_SRCS "src/ort/*.cpp")
 file(GLOB_RECURSE OVN_SRCS "src/ovn/*.cpp")
-file(GLOB_RECURSE TRT_SRCS "src/trt/*.cpp")
-file(GLOB_RECURSE RKN_SRCS "src/rkn/*.cpp")
-list(APPEND ONE_YOLO_DEPEND_SRCS ${BASE_SRCS} ${TRACK_SRCS})
+list(APPEND ONE_YOLO_DEPEND_SRCS ${BASE_SRCS})
 list(APPEND ONE_YOLO_DEPEND_LIBS ${OpenCV_LIBS})
 
 # enable onnxruntime, 
@@ -64,24 +59,8 @@ if(BUILD_WITH_OVN)
     list(APPEND ONE_YOLO_DEPEND_SRCS ${OVN_SRCS})
     list(APPEND ONE_YOLO_DEPEND_LIBS openvino::runtime)
 endif()
-# enable tensorrt, 
-# make sure tensorrt installed and include & libs path could be found by cmake
-if(BUILD_WITH_TRT)
-    include_directories("/usr/local/tensorRT/include")
-    link_directories("/usr/local/tensorRT/lib")
-    add_definitions(-DBUILD_WITH_TRT)
-    list(APPEND ONE_YOLO_DEPEND_SRCS ${TRT_SRCS})
-    list(APPEND ONE_YOLO_DEPEND_LIBS nvinfer cudart)
-endif()
-# enable rknn, 
-# make sure rknn runtime installed and include & libs path could be found by cmake
-if(BUILD_WITH_RKN)
-    include_directories("/sd/z/rknnrt/include")
-    link_directories("/sd/z/rknnrt/libs")
-    add_definitions(-DBUILD_WITH_RKN)
-    list(APPEND ONE_YOLO_DEPEND_SRCS ${RKN_SRCS})
-    list(APPEND ONE_YOLO_DEPEND_LIBS rknnrt)
-endif()
+file(GLOB_RECURSE TRACK_SRCS "src/track/*.cpp")
+list(APPEND ONE_YOLO_DEPEND_SRCS ${TRACK_SRCS})
 
 add_library(${PROJECT_NAME} SHARED ${ONE_YOLO_DEPEND_SRCS})
 target_link_libraries(${PROJECT_NAME} ${ONE_YOLO_DEPEND_LIBS})

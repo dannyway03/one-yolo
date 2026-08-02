@@ -1026,9 +1026,6 @@ enum class YoloTaskType
 {
   CLS,
   DET,
-  SEG,
-  POSE,
-  OBB
 };
 enum class YoloVersion
 {
@@ -1040,15 +1037,11 @@ enum class YoloVersion
 };
 enum class YoloTargetRT
 {
-  OPENCV_CPU,  // use opencv::dnn(cpu) as inference backend for Yolo
-  OPENCV_CUDA, // use opencv::dnn(cuda) as inference backend for Yolo
-  ORT_CPU,     // use onnxruntime(cpu) as inference backend for Yolo
-  ORT_CUDA,    // use onnxruntime(cuda) as inference backend for Yolo
-  OVN_AUTO,    // use openvino(auto) as inference backend for Yolo
-  OVN_CPU,     // use openvino(cpu) as inference backend for Yolo
-  OVN_GPU,     // use openvino(integrated gpu) as inference backend for Yolo
-  TRT,         // use tensorrt(cuda) as inference backend for Yolo
-  RKNN         // use rknn(rockchip) as inference backend for Yolo
+  ORT_CPU,  // use onnxruntime(cpu) as inference backend for Yolo
+  ORT_CUDA, // use onnxruntime(cuda) as inference backend for Yolo
+  OVN_AUTO, // use openvino(auto) as inference backend for Yolo
+  OVN_CPU,  // use openvino(cpu) as inference backend for Yolo
+  OVN_GPU,  // use openvino(integrated gpu) as inference backend for Yolo
 };
 
 struct YoloConfig
@@ -1057,7 +1050,7 @@ struct YoloConfig
   std::string model_path_;
   YoloTaskType task_ = YoloTaskType::DET;
   YoloVersion version_ = YoloVersion::YOLO11;
-  YoloTargetRT target_rt_ = YoloTargetRT::OPENCV_CUDA;
+  YoloTargetRT target_rt_ = YoloTargetRT::ORT_CPU;
 
   int batch_size_ = 1;         // batch size for Yolo model, 0 means dynamic batch size
   int input_w_ = 640;          // input width for Yolo model

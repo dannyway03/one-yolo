@@ -258,8 +258,6 @@ resolveRuntime(const std::string& backend, const std::string& device) -> YoloTar
       return YoloTargetRT::OVN_AUTO;
     return YoloTargetRT::OVN_CPU;
   }
-  if (backend == "dnn")
-    return (device == "cuda") ? YoloTargetRT::OPENCV_CUDA : YoloTargetRT::OPENCV_CPU;
   throw std::runtime_error("unknown --backend: " + backend);
 }
 
@@ -270,12 +268,6 @@ resolveTask(const std::string& s) -> YoloTaskType
     return YoloTaskType::DET;
   if (s == "cls")
     return YoloTaskType::CLS;
-  if (s == "seg")
-    return YoloTaskType::SEG;
-  if (s == "pose")
-    return YoloTaskType::POSE;
-  if (s == "obb")
-    return YoloTaskType::OBB;
   throw std::runtime_error("unknown --task: " + s);
 }
 
