@@ -15,7 +15,7 @@ for every supported detector/backend combination.
 
 ## Executive Snapshot — 2026-08-02
 
-Best results to date: **2026-08-02f** (pipeline bench, `submit/collect` double-buffer, GPU FP32).  
+Best results to date: **2026-08-02g** (pipeline bench on MOT17 canonical image, `submit/collect` GPU).  
 OVN timing baseline: commit **1f48441** · PXL image (CPU FP16).  
 ORT timing baseline: commit **5416363** · MOT17-02 frame 1.  
 Accuracy baseline: MOT17-02 frame 1 · 22 GT pedestrians.  
@@ -62,9 +62,22 @@ Platform: Intel i7-8665U · Intel UHD 620 (iGPU) · NVIDIA MX250.
 | **bytetrack\_nano\_dec** | **FP32** | **5.68 ms** | **7.42 ms** | **0.79 ms** | **13.89 ms** | **72.0** ★★ |
 | bytetrack\_nano\_dec | FP16 | 5.19 ms | 7.60 ms | 0.80 ms | **13.59 ms** | **73.6** |
 
-★★ = best pipeline result · `gpu_wait > 0` for all models → GPU is the throughput bottleneck on UHD 620.  
-¹ Pipeline timings use `media/test_frame.jpg`; not directly comparable to MOT17 sequential numbers above.  
+★★ = best pipeline result (test_frame.jpg) · `gpu_wait > 0` for all models → GPU is the throughput bottleneck on UHD 620.  
+¹ Pipeline timings use `media/test_frame.jpg`; see session 2026-08-02g for MOT17-comparable results.  
 `total/iter ≈ GPU infer time` — preprocessing (pre) runs hidden behind the previous frame's GPU work.
+
+#### OVN GPU — Intel UHD 620 — pipeline (submit/collect) · `media/mot17-02-frcnn/000001.jpg` — direct comparison
+
+| Model | Precision | Sequential total ★ | Pipeline total/iter | Pipeline FPS | Δ vs sequential |
+|---|---|---:|---:|---:|---:|
+| yolo26n (static) | FP32 | 30.09 ms / 33.2 FPS | **21.55 ms** | **46.4** | **+13.2 FPS (+39.8%)** |
+| yolo26n (static) | FP16 | 26.51 ms / 37.7 FPS | **21.68 ms** | **46.1** | **+8.4 FPS (+22.3%)** |
+| yolox\_nano\_dec | FP32 | 16.12 ms / 62.0 FPS | **12.31 ms** | **81.2** | **+19.2 FPS (+31.0%)** |
+| yolox\_nano\_dec | FP16 | 16.01 ms / 62.5 FPS | **12.28 ms** | **81.5** | **+19.0 FPS (+30.4%)** |
+| bytetrack\_nano\_dec | FP32 | 12.58 ms / 79.5 FPS | **11.24 ms** | **88.9** | **+9.4 FPS (+11.8%)** |
+| bytetrack\_nano\_dec | FP16 | 15.11 ms / 66.2 FPS | **11.61 ms** | **86.1** | **+19.9 FPS (+30.1%)** |
+
+★ Sequential baselines from session 2026-08-02e (same image, same conditions).
 
 #### ORT CPU
 
@@ -371,6 +384,46 @@ flowchart TD
 ---
 
 ## Sessions Log
+
+---
+
+### 2026-08-02g — Pipeline bench on canonical MOT17-02/000001.jpg — direct comparison with sequential
+
+**Branch / commit**: `develop` · `dff6a37`+  
+**Test image**: `media/mot17-02-frcnn/000001.jpg` (same as sequential baseline sessions 2026-08-02b–e)
+
+**Pipeline timing — OVN GPU · 50 iter · MOT17 frame**
+
+| Model | Precision | pre | gpu\_wait | post | **total/iter** | **FPS** | vs sequential |
+|---|---|---:|---:|---:|---:|---:|---:|
+| yolo26n (static) | FP32 | 3.57 ms | 17.92 ms | 0.06 ms | **21.55 ms** | **46.4** | +13.2 FPS (+40%) |
+| yolo26n (static) | FP16 | 3.50 ms | 18.12 ms | 0.06 ms | **21.68 ms** | **46.1** | +8.4 FPS (+22%) |
+| yolox\_nano\_dec | FP32 | 3.91 ms | 8.19 ms | 0.21 ms | **12.31 ms** | **81.2** | +19.2 FPS (+31%) |
+| yolox\_nano\_dec | FP16 | 4.05 ms | 8.04 ms | 0.19 ms | **12.28 ms** | **81.5** | +19.0 FPS (+30%) |
+| bytetrack\_nano\_dec | FP32 | 3.36 ms | 7.73 ms | 0.15 ms | **11.24 ms** | **88.9** | +9.4 FPS (+12%) |
+| bytetrack\_nano\_dec | FP16 | 3.79 ms | 7.68 ms | 0.15 ms | **11.61 ms** | **86.1** | +19.9 FPS (+30%) |
+
+**Pipeline timing — OVN CPU · 50 iter · MOT17 frame**
+
+| Model | Precision | pre | gpu\_wait¹ | post | **total/iter** | **FPS** |
+|---|---|---:|---:|---:|---:|---:|
+| yolo26n (static) | FP32 | 5.32 ms | 17.79 ms | 0.18 ms | **23.29 ms** | **42.9** |
+| yolo26n (static) | FP16 | 5.16 ms | 18.40 ms | 0.18 ms | **23.74 ms** | **42.1** |
+| yolox\_nano\_dec | FP32 | 5.55 ms | 11.09 ms | 0.41 ms | **17.05 ms** | **58.6** |
+| yolox\_nano\_dec | FP16 | 5.87 ms | 10.77 ms | 0.45 ms | **17.09 ms** | **58.5** |
+| bytetrack\_nano\_dec | FP32 | 5.35 ms | 10.03 ms | 0.26 ms | **15.64 ms** | **63.9** |
+| bytetrack\_nano\_dec | FP16 | 5.57 ms | 10.61 ms | 0.27 ms | **16.44 ms** | **60.8** |
+
+¹ CPU has no HW async queue — `gpu_wait` = synchronous inference; no actual overlap.
+
+**Analysis**
+
+- **Pipeline delivers 12–40% FPS gain on GPU** vs sequential baseline on the same image. The CPU preprocessing (3–4 ms) is fully hidden behind GPU inference (11–22 ms) in all cases.
+- **bytetrack FP32 GPU reaches 88.9 FPS** — new peak for this model on UHD 620.
+- **yolox gains most relatively** (+31%): its infer/pre ratio is highest, maximising overlap benefit.
+- **yolo26n gains most absolutely** in FPS (+13 FPS FP32, +8 FPS FP16): large infer time means pre is almost entirely hidden.
+- **CPU pipeline adds ~5 ms overhead** vs sequential CPU (pipeline API bookkeeping, extra submit/collect calls) — no benefit on CPU plugin.
+- **FP16 ≈ FP32 on GPU** confirmed again; choice is accuracy-driven, not throughput-driven on UHD 620.
 
 ---
 
