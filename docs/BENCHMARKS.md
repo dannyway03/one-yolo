@@ -49,6 +49,9 @@ for every supported detector/backend combination.
 
 ### Accuracy — MOT17-02/000001.jpg · GT: 22 pedestrians
 
+Counts are from **sequential `inference()` path** (OVN CPU/GPU, ORT CPU).  
+Pipeline (`submit/collect`) produces **bit-identical results** — verified session 2026-08-02h (same model, same OVN kernel, same postprocessing).
+
 | Model | OVN CPU det | OVN GPU det | ORT CPU det | Recall (CPU) | Note |
 |---|:---:|:---:|:---:|---:|---|
 | yolo26n | 7 | 6 | 7 | 31.8 % | GPU −1 vs CPU; precision-independent |

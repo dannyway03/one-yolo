@@ -380,6 +380,7 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
 
     cv::Mat frame = makeFrame(a);
     std::vector<cv::Mat> batch{frame};
+    YoloResult last_result;
 
 #ifdef BUILD_WITH_OVN
     if (a.pipeline_)
@@ -420,8 +421,10 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
         ovn->submit(blobs[bidx]);
         auto raw = ovn->collect(); // waits for blobs[bidx^1] — already safe to reuse next iter
         auto t2 = Clock::now();
-        model.task()->postprocess(raw, 1);
+        auto pipe_results = model.task()->postprocess(raw, 1);
         auto t3 = Clock::now();
+        if (i == a.iterations_ - 1)
+          last_result = pipe_results[0];
         bidx ^= 1;
 
         auto ms_of = [](auto a, auto b)
@@ -456,6 +459,8 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
       std::cout << "\nFPS (1000 / total_avg): " << std::fixed << std::setprecision(1)
                 << (tot.avg_ > 0.0 ? 1000.0 / tot.avg_ : 0.0) << "\n";
       std::cout << "note: 'gpu wait' ~ 0 means full overlap achieved; total ≈ max(pre+post, infer)\n";
+      if (!last_result.detections.empty() || !last_result.classes.empty())
+        std::cout << "detections (last frame): " << last_result.detections.size() << "\n";
       return 0;
     }
 #endif
@@ -474,7 +479,6 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
     post_ms.reserve(static_cast<size_t>(a.iterations_));
     total_ms.reserve(static_cast<size_t>(a.iterations_));
 
-    YoloResult last_result;
     for (int i = 0; i < a.iterations_; ++i)
     {
       auto results = model(batch);
