@@ -558,6 +558,12 @@ The `runLoop` function itself doesn't reference those — they are in the sample
 
 **Gate 2-D**: `grep -n "no_json\|no_csv\|model_\|version_\|input_w_\|input_h_\|classes_\|conf_\|iou_\|names_" samples/common.hpp` → 0 lines.
 
+> **Note (gate over-match, resolved 2026-08-02)**: the literal step-2-D pattern above matches
+> `t.iou_thresh = 0.6f;` in `buildTrackerConfig()`. That field is **live SORT-tracker config**
+> (the tracker subsystem is kept in Phase 1), not a removed CLI flag. Per user decision, use the
+> acceptance-table pattern (`no_json|no_csv|model_|version_|classes_`) for this gate — `iou_thresh`
+> in tracker config is intentionally retained.
+
 ---
 
 ### 2-E  Edit sample `main()` functions

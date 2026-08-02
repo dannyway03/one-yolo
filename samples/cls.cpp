@@ -16,7 +16,7 @@ main(int argc, char* argv[]) -> int
       return 0;
     }
     const app::CliArgs a = app::parseArgs(argc, argv);
-    if (a.model_.empty())
+    if (a.config_.empty())
     {
       app::printUsage(argv[0], "image classification (cls) — top1/top5 output");
       return 1;
@@ -30,10 +30,6 @@ main(int argc, char* argv[]) -> int
                  {
                    auto result = model(frame);
                    result.info();
-                   if (!a.no_json_)
-                     result.to_json(/*print=*/true);
-                   if (!a.no_csv_)
-                     result.to_csv(/*print=*/true);
                    const int key = result.show(/*block=*/single_shot, a.scale_, DrawParam{}, false, false);
                    return !single_shot && (key != 27);
                    /*

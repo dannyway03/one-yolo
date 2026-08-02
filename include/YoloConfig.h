@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 namespace yolo {
 
 // #define DOTAV1_NAMES {"plane", "ship", "storage tank", "baseball diamond", "tennis court", "basketball court",
@@ -1068,6 +1070,9 @@ struct YoloConfig
   std::vector<float> mean_;    // mean value of preprocess for Yolo model, null by default
   std::vector<float> std_;     // std value of preprocess for Yolo model, null by default
   std::vector<std::string> names_ = COCO_NAMES; // class names for Yolo model
+
+  [[nodiscard]] static auto
+  from_json(const std::string& json_path) -> YoloConfig; // NOLINT
 };
 
 auto

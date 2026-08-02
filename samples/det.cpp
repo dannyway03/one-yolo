@@ -1,7 +1,5 @@
 #include <iostream>
 #include <optional>
-#include <stdexcept>
-#include <vector>
 
 #include "common.hpp"
 
@@ -18,7 +16,7 @@ main(int argc, char* argv[]) -> int
       return 0;
     }
     const app::CliArgs a = app::parseArgs(argc, argv);
-    if (a.model_.empty())
+    if (a.config_.empty())
     {
       app::printUsage(argv[0], "object detection (det) with optional SORT tracking");
       return 1;
@@ -41,10 +39,6 @@ main(int argc, char* argv[]) -> int
                    if (tracker.has_value() && !single_shot)
                      (*tracker)(result);
                    result.info();
-                   if (!a.no_json_)
-                     result.to_json(/*print=*/true);
-                   if (!a.no_csv_)
-                     result.to_csv(/*print=*/true);
                    const int key = result.show(/*block=*/single_shot, a.scale_, DrawParam{}, false, !single_shot);
                    return !single_shot && (key != 27);
                    /*

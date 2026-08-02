@@ -59,11 +59,12 @@ if(BUILD_WITH_OVN)
     list(APPEND ONE_YOLO_DEPEND_SRCS ${OVN_SRCS})
     list(APPEND ONE_YOLO_DEPEND_LIBS openvino::runtime)
 endif()
+find_package(nlohmann_json REQUIRED)
 file(GLOB_RECURSE TRACK_SRCS "src/track/*.cpp")
 list(APPEND ONE_YOLO_DEPEND_SRCS ${TRACK_SRCS})
 
 add_library(${PROJECT_NAME} SHARED ${ONE_YOLO_DEPEND_SRCS})
-target_link_libraries(${PROJECT_NAME} ${ONE_YOLO_DEPEND_LIBS})
+target_link_libraries(${PROJECT_NAME} ${ONE_YOLO_DEPEND_LIBS} nlohmann_json::nlohmann_json)
 
 ##########################
 # build one-yolo tools #

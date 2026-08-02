@@ -5,14 +5,8 @@
  * YoloConfig / Yolo class, so numbers reflect real application cost.
  *
  * Usage:
- *   bench --model <path> --version <yolox|bytetrack|yolo26|yolo11|yolo8|yolo5|yolo5u>
- *         --backend <ort|ovn|dnn> [--device <cpu|gpu|auto|cuda>]
- *         [--task <det|cls|seg|pose|obb>]
- *         [--input-w 640] [--input-h 640] [--classes 80]
- *         [--warmup 10] [--iterations 100]
- *         [--image <path>]   # real image; random noise used when omitted
- *         [--save <path>]    # save annotated result (detection only)
- *         [--csv  <path>]    # append one summary row to CSV file
+ *   bench <config.json> --img <path> [--backend ort|ovn] [--device cpu|gpu|auto|cuda]
+ *         [--warmup 10] [--iterations 100] [--pipeline]
  */
 
 #include <chrono>
@@ -31,6 +25,7 @@
 #include <string>
 #include <vector>
 
+#include "app_common.hpp"
 #include "Yolo.h"
 #include "YoloTask.h"
 #ifdef BUILD_WITH_OVN
@@ -38,6 +33,7 @@
 #endif
 
 using namespace yolo;
+using app::resolveRuntime;
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -103,14 +99,9 @@ printRow(const std::string& label, const Stats& s)
 
 struct Args
 {
-  std::string model_path_;
-  std::string version_str_ = "yolox";
+  std::string config_;
   std::string backend_str_ = "ort";
   std::string device_str_ = "cpu";
-  std::string task_str_ = "det";
-  int input_w_ = 640;
-  int input_h_ = 640;
-  int classes_ = 80;
   int warmup_ = 10;
   int iterations_ = 100;
   std::string image_path_;
@@ -122,27 +113,22 @@ struct Args
 static void
 usage(const char* prog)
 {
-  std::cerr << "usage: " << prog << "\n"
-            << "  --model      <path>              model file (.onnx / .xml)\n"
-            << "  --version    <yolox|bytetrack|yolo26|yolo11|yolo8|yolo5|yolo5u>  (default: yolox)\n"
-            << "  --backend    <ort|ovn|dnn>       inference backend (default: ort)\n"
-            << "  --device     <cpu|gpu|auto|cuda> device for backend (default: cpu)\n"
-            << "  --task       <det|cls|seg|pose|obb> (default: det)\n"
-            << "  --input-w    <int>               model input width  (default: 640)\n"
-            << "  --input-h    <int>               model input height (default: 640)\n"
-            << "  --classes    <int>               number of classes  (default: 80)\n"
-            << "  --warmup     <int>               warmup runs        (default: 10)\n"
-            << "  --iterations <int>               benchmark runs     (default: 100)\n"
-            << "  --image      <path>              input image (random noise if omitted)\n"
-            << "  --save       <path>              save annotated result image\n"
-            << "  --csv        <path>              append summary row to CSV\n"
-            << "  --pipeline                       double-buffer mode: overlap CPU pre with GPU infer (OVN only)\n";
+  std::cerr << "usage: " << prog << " <config.json> [options]\n"
+            << "  --backend    <ort|ovn>             inference backend (default: ort)\n"
+            << "  --device     <cpu|gpu|auto|cuda>   device for backend (default: cpu)\n"
+            << "  --warmup     <int>                 warmup runs        (default: 10)\n"
+            << "  --iterations <int>                 benchmark runs     (default: 100)\n"
+            << "  --image      <path>                input image (random noise if omitted)\n"
+            << "  --save       <path>                save annotated result image\n"
+            << "  --csv        <path>                append summary row to CSV\n"
+            << "  --pipeline                         double-buffer mode: overlap CPU pre with GPU infer (OVN only)\n";
 }
 
 static auto
 parse(int argc, char** argv) -> Args // NOLINT(modernize-avoid-c-arrays)
 {
   Args a;
+  int positional = 0;
   for (int i = 1; i < argc; ++i)
   {
     std::string k = argv[i]; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
@@ -152,37 +138,13 @@ parse(int argc, char** argv) -> Args // NOLINT(modernize-avoid-c-arrays)
         throw std::runtime_error("missing value for " + k);
       return argv[++i]; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     };
-    if (k == "--model")
-    {
-      a.model_path_ = need();
-    }
-    else if (k == "--version")
-    {
-      a.version_str_ = need();
-    }
-    else if (k == "--backend")
+    if (k == "--backend")
     {
       a.backend_str_ = need();
     }
     else if (k == "--device")
     {
       a.device_str_ = need();
-    }
-    else if (k == "--task")
-    {
-      a.task_str_ = need();
-    }
-    else if (k == "--input-w")
-    {
-      a.input_w_ = std::stoi(need());
-    }
-    else if (k == "--input-h")
-    {
-      a.input_h_ = std::stoi(need());
-    }
-    else if (k == "--classes")
-    {
-      a.classes_ = std::stoi(need());
     }
     else if (k == "--warmup")
     {
@@ -213,89 +175,38 @@ parse(int argc, char** argv) -> Args // NOLINT(modernize-avoid-c-arrays)
       usage(argv[0]);
       std::exit(0);
     } // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-    else
+    else if (k.rfind("--", 0) == 0)
     {
       throw std::runtime_error("unknown argument: " + k);
     }
+    else
+    {
+      if (positional == 0)
+        a.config_ = k;
+      else
+        throw std::runtime_error("unexpected positional argument: " + k);
+      ++positional;
+    }
   }
-  if (a.model_path_.empty())
-    throw std::runtime_error("--model is required");
+  if (a.config_.empty())
+    throw std::runtime_error("config.json is required");
   return a;
 }
 
-// ── config builders ───────────────────────────────────────────────────────────
-
-static auto
-resolveVersion(const std::string& s) -> YoloVersion
-{
-  if (s == "yolo5")
-    return YoloVersion::YOLO5;
-  if (s == "yolo5u")
-    return YoloVersion::YOLO5U;
-  if (s == "yolo8")
-    return YoloVersion::YOLO8;
-  if (s == "yolo11")
-    return YoloVersion::YOLO11;
-  if (s == "yolo26")
-    return YoloVersion::YOLO26;
-  if (s == "yolox")
-    return YoloVersion::YOLO5; // decoded YOLOX → YOLO5 decoder
-  if (s == "bytetrack")
-    return YoloVersion::YOLO5; // bytetrack decoded output shares YOLOX/YOLO5 format
-  throw std::runtime_error("unknown --version: " + s);
-}
-
-static auto
-resolveRuntime(const std::string& backend, const std::string& device) -> YoloTargetRT
-{
-  if (backend == "ort")
-    return (device == "cuda") ? YoloTargetRT::ORT_CUDA : YoloTargetRT::ORT_CPU;
-  if (backend == "ovn")
-  {
-    if (device == "gpu")
-      return YoloTargetRT::OVN_GPU;
-    if (device == "auto")
-      return YoloTargetRT::OVN_AUTO;
-    return YoloTargetRT::OVN_CPU;
-  }
-  throw std::runtime_error("unknown --backend: " + backend);
-}
-
-static auto
-resolveTask(const std::string& s) -> YoloTaskType
-{
-  if (s == "det")
-    return YoloTaskType::DET;
-  if (s == "cls")
-    return YoloTaskType::CLS;
-  throw std::runtime_error("unknown --task: " + s);
-}
+// ── config builder ────────────────────────────────────────────────────────────
 
 static auto
 buildConfig(const Args& a) -> YoloConfig
 {
-  YoloConfig cfg;
-  cfg.desc_ = a.version_str_ + " [" + a.backend_str_ + "/" + a.device_str_ + "] bench";
-  cfg.model_path_ = a.model_path_;
-  cfg.version_ = resolveVersion(a.version_str_);
+  auto cfg = YoloConfig::from_json(a.config_);
   cfg.target_rt_ = resolveRuntime(a.backend_str_, a.device_str_);
-  cfg.task_ = resolveTask(a.task_str_);
-  cfg.input_w_ = a.input_w_;
-  cfg.input_h_ = a.input_h_;
-  cfg.batch_size_ = 1;
-  cfg.num_classes_ = a.classes_;
-  cfg.rgb_ = true;
-  // YOLOX expects raw pixel values; all other versions expect normalised [0, 1]
-  cfg.scale_f_ = (a.version_str_ == "yolox") ? 1.0f : 1.0f / 255.0f;
-  cfg.names_ = (a.classes_ == 80) ? std::vector<std::string>{COCO_NAMES} :
-                                    std::vector<std::string>(static_cast<size_t>(a.classes_), "obj");
   return cfg;
 }
 
 // ── input frame ──────────────────────────────────────────────────────────────
 
 static auto
-makeFrame(const Args& a) -> cv::Mat
+makeFrame(const Args& a, int w, int h) -> cv::Mat
 {
   if (!a.image_path_.empty())
   {
@@ -304,7 +215,7 @@ makeFrame(const Args& a) -> cv::Mat
       throw std::runtime_error("cannot read image: " + a.image_path_);
     return img;
   }
-  cv::Mat noise(a.input_h_, a.input_w_, CV_8UC3);
+  cv::Mat noise(h, w, CV_8UC3);
   std::mt19937 rng(42);
   std::uniform_int_distribution<int> dist(0, 255);
   for (int r = 0; r < noise.rows; ++r)
@@ -321,8 +232,8 @@ makeFrame(const Args& a) -> cv::Mat
 // ── CSV ───────────────────────────────────────────────────────────────────────
 
 static void
-appendCsv(const std::string& path, const Args& a, const Stats& pre, const Stats& infer, const Stats& post,
-          const Stats& total)
+appendCsv(const std::string& path, const Args& a, const YoloConfig& cfg, const Stats& pre, const Stats& infer,
+          const Stats& post, const Stats& total)
 {
   bool write_header = false;
   {
@@ -338,11 +249,11 @@ appendCsv(const std::string& path, const Args& a, const Stats& pre, const Stats&
       << "post_avg,post_p95,post_p99,"
       << "total_avg,total_p95,total_p99\n";
   }
-  f << std::fixed << std::setprecision(3) << a.version_str_ << "," << a.backend_str_ << "," << a.device_str_ << ","
-    << a.task_str_ << "," << a.input_w_ << "," << a.input_h_ << "," << a.classes_ << "," << a.iterations_ << ","
-    << pre.avg_ << "," << pre.p95_ << "," << pre.p99_ << "," << infer.avg_ << "," << infer.p95_ << "," << infer.p99_
-    << "," << post.avg_ << "," << post.p95_ << "," << post.p99_ << "," << total.avg_ << "," << total.p95_ << ","
-    << total.p99_ << "\n";
+  f << std::fixed << std::setprecision(3) << toString(cfg.version_) << "," << a.backend_str_ << "," << a.device_str_
+    << "," << toString(cfg.task_) << "," << cfg.input_w_ << "," << cfg.input_h_ << "," << cfg.num_classes_ << ","
+    << a.iterations_ << "," << pre.avg_ << "," << pre.p95_ << "," << pre.p99_ << "," << infer.avg_ << "," << infer.p95_
+    << "," << infer.p99_ << "," << post.avg_ << "," << post.p95_ << "," << post.p99_ << "," << total.avg_ << ","
+    << total.p95_ << "," << total.p99_ << "\n";
 }
 
 // ── main ─────────────────────────────────────────────────────────────────────
@@ -357,12 +268,12 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
     YoloConfig cfg = buildConfig(a);
 
     std::cout << "\n=== one-yolo bench ===\n";
-    std::cout << "version    : " << a.version_str_ << "\n";
+    std::cout << "version    : " << toString(cfg.version_) << "\n";
     std::cout << "backend    : " << a.backend_str_ << " / " << a.device_str_ << "\n";
-    std::cout << "task       : " << a.task_str_ << "\n";
-    std::cout << "model      : " << a.model_path_ << "\n";
-    std::cout << "input      : " << a.input_w_ << "x" << a.input_h_ << "\n";
-    std::cout << "classes    : " << a.classes_ << "\n";
+    std::cout << "task       : " << toString(cfg.task_) << "\n";
+    std::cout << "model      : " << cfg.model_path_ << "\n";
+    std::cout << "input      : " << cfg.input_w_ << "x" << cfg.input_h_ << "\n";
+    std::cout << "classes    : " << cfg.num_classes_ << "\n";
     std::cout << "warmup     : " << a.warmup_ << "\n";
     std::cout << "iterations : " << a.iterations_ << "\n";
     std::cout << "image      : " << (a.image_path_.empty() ? "(random noise)" : a.image_path_) << "\n\n";
@@ -370,7 +281,7 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
     auto model = Yolo(cfg);
     model.info();
 
-    cv::Mat frame = makeFrame(a);
+    cv::Mat frame = makeFrame(a, cfg.input_w_, cfg.input_h_);
     std::vector<cv::Mat> batch{frame};
     YoloResult last_result;
 
@@ -520,7 +431,7 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
 
     if (!a.csv_path_.empty())
     {
-      appendCsv(a.csv_path_, a, pre, infer, post, total);
+      appendCsv(a.csv_path_, a, cfg, pre, infer, post, total);
       std::cout << "csv row appended: " << a.csv_path_ << "\n";
     }
   }

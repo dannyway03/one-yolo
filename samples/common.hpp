@@ -13,6 +13,7 @@
 
 #include <opencv2/opencv.hpp>
 
+#include "../tools/app_common.hpp"
 #include "track/YoloTracker.h"
 #include "Yolo.h"
 
@@ -29,21 +30,12 @@ constexpr float kDefaultScale = 1.0f;
 
 struct CliArgs
 {
-  std::string model_;
-  std::string version_ = "yolo11";
+  std::string source_;
+  std::string config_;
   std::string backend_ = "ort";
   std::string device_ = "cpu";
-  std::string source_;
-  int input_w_ = kDefaultW;
-  int input_h_ = kDefaultH;
-  int classes_ = kDefaultClasses;
-  float conf_ = kDefaultConf;
-  float iou_ = kDefaultIou;
   float scale_ = kDefaultScale;
-  bool no_json_ = false;
-  bool no_csv_ = false;
   bool no_track_ = false;
-  std::optional<std::string> names_;
 };
 
 // ── source classification ─────────────────────────────────────────────────────
@@ -92,62 +84,10 @@ resolveVersion(const std::string& s) -> yolo::YoloVersion
 }
 
 [[nodiscard]] inline auto
-resolveRuntime(const std::string& backend, const std::string& device) -> yolo::YoloTargetRT
+buildYoloConfig(const CliArgs& a, yolo::YoloTaskType /*task*/) -> yolo::YoloConfig
 {
-  if (backend == "ort")
-    return (device == "cuda") ? yolo::YoloTargetRT::ORT_CUDA : yolo::YoloTargetRT::ORT_CPU;
-  if (backend == "ovn")
-  {
-    if (device == "gpu")
-      return yolo::YoloTargetRT::OVN_GPU;
-    if (device == "auto")
-      return yolo::YoloTargetRT::OVN_AUTO;
-    return yolo::YoloTargetRT::OVN_CPU;
-  }
-  throw std::runtime_error("unknown --backend: " + backend);
-}
-
-[[nodiscard]] inline auto
-buildYoloConfig(const CliArgs& a, yolo::YoloTaskType task) -> yolo::YoloConfig
-{
-  yolo::YoloConfig cfg;
-  cfg.desc_ = a.version_ + " [" + a.backend_ + "/" + a.device_ + "]";
-  cfg.model_path_ = a.model_;
-  cfg.version_ = resolveVersion(a.version_);
+  auto cfg = yolo::YoloConfig::from_json(a.config_);
   cfg.target_rt_ = resolveRuntime(a.backend_, a.device_);
-  cfg.task_ = task;
-  cfg.input_w_ = a.input_w_;
-  cfg.input_h_ = a.input_h_;
-  cfg.batch_size_ = 1;
-  cfg.num_classes_ = a.classes_;
-  cfg.conf_thresh_ = a.conf_;
-  cfg.iou_thresh_ = a.iou_;
-  cfg.rgb_ = true;
-  // YOLOX decoded models expect raw [0, 255] pixel values; all other versions use [0, 1]
-  cfg.scale_f_ = (a.version_ == "yolox") ? 1.0f : 1.0f / 255.0f;
-
-  if (a.names_.has_value())
-  {
-    std::vector<std::string> name_list;
-    std::istringstream ss(*a.names_);
-    std::string token;
-    while (std::getline(ss, token, ','))
-      if (!token.empty())
-        name_list.push_back(token);
-    cfg.names_ = name_list;
-  }
-  else if (a.classes_ == 80)
-  {
-    cfg.names_ = std::vector<std::string>{COCO_NAMES};
-  }
-  else if (a.classes_ == 1000)
-  {
-    cfg.names_ = std::vector<std::string>{IMAGENET_NAMES};
-  }
-  else
-  {
-    cfg.names_ = std::vector<std::string>(static_cast<size_t>(a.classes_), "obj");
-  }
   return cfg;
 }
 
@@ -165,31 +105,23 @@ buildTrackerConfig() -> yolo::YoloTrackConfig
 inline void
 printUsage(const char* app_name, const char* task_desc)
 {
-  std::cout << "usage: " << app_name << " --model <path> [options]\n"
-            << "  task:       " << task_desc << "\n\n"
-            << "  --model      <path>                model file (.onnx / .xml)\n"
-            << "  --version    yolox|yolo26|yolo11|yolo8|yolo5|yolo5u  (default: yolo11)\n"
-            << "  --backend    ort|ovn|dnn           inference backend (default: ort)\n"
-            << "  --device     cpu|gpu|auto|cuda     device for backend (default: cpu)\n"
-            << "  --source     <path|0|1|...>        image, video file, or webcam index\n"
-            << "  --input-w    <int>                 model input width  (default: 640)\n"
-            << "  --input-h    <int>                 model input height (default: 640)\n"
-            << "  --classes    <int>                 number of classes  (default: 80)\n"
-            << "  --names      <a,b,c,...>           comma-separated class names\n"
-            << "  --conf       <float>               confidence threshold (default: 0.25)\n"
-            << "  --iou        <float>               NMS IoU threshold   (default: 0.45)\n"
-            << "  --scale      <float>               display scale       (default: 1.0)\n"
-            << "  --no-json                          suppress per-frame JSON output\n"
-            << "  --no-csv                           suppress per-frame CSV output\n"
-            << "  --no-track                         disable SORT tracker\n";
+  std::cout << "usage: " << app_name << " <source> <config.json> [options]\n"
+            << "  task: " << task_desc << "\n\n"
+            << "  <source>         image file, video file, or webcam index\n"
+            << "  <config.json>    model config (model path + blob params)\n"
+            << "  --backend        ort|ovn                     (default: ort)\n"
+            << "  --device         cpu|gpu|auto|cuda           (default: cpu)\n"
+            << "  --scale          <float>  display scale      (default: 1.0)\n"
+            << "  --no-track       disable SORT tracker (det only)\n";
 }
 
 // ── arg parser ────────────────────────────────────────────────────────────────
 
 [[nodiscard]] inline auto
-parseArgs(int argc, char** argv) -> CliArgs // NOLINT(modernize-avoid-c-arrays)
+parseArgs(int argc, char** argv) -> CliArgs
 {
   CliArgs a;
+  int positional = 0;
   for (int i = 1; i < argc; ++i)
   {
     const std::string k = argv[i];
@@ -197,17 +129,9 @@ parseArgs(int argc, char** argv) -> CliArgs // NOLINT(modernize-avoid-c-arrays)
     {
       if (i + 1 >= argc)
         throw std::runtime_error("missing value for " + k);
-      return argv[++i]; // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      return argv[++i];
     };
-    if (k == "--model")
-    {
-      a.model_ = next();
-    }
-    else if (k == "--version")
-    {
-      a.version_ = next();
-    }
-    else if (k == "--backend")
+    if (k == "--backend")
     {
       a.backend_ = next();
     }
@@ -215,56 +139,30 @@ parseArgs(int argc, char** argv) -> CliArgs // NOLINT(modernize-avoid-c-arrays)
     {
       a.device_ = next();
     }
-    else if (k == "--source")
-    {
-      a.source_ = next();
-    }
-    else if (k == "--input-w")
-    {
-      a.input_w_ = std::stoi(next());
-    }
-    else if (k == "--input-h")
-    {
-      a.input_h_ = std::stoi(next());
-    }
-    else if (k == "--classes")
-    {
-      a.classes_ = std::stoi(next());
-    }
-    else if (k == "--names")
-    {
-      a.names_ = next();
-    }
-    else if (k == "--conf")
-    {
-      a.conf_ = std::stof(next());
-    }
-    else if (k == "--iou")
-    {
-      a.iou_ = std::stof(next());
-    }
     else if (k == "--scale")
     {
       a.scale_ = std::stof(next());
-    }
-    else if (k == "--no-json")
-    {
-      a.no_json_ = true;
-    }
-    else if (k == "--no-csv")
-    {
-      a.no_csv_ = true;
     }
     else if (k == "--no-track")
     {
       a.no_track_ = true;
     }
     else if (k == "--help" || k == "-h")
-    { /* handled by caller */
+    { /* caller handles */
+    }
+    else if (k.rfind("--", 0) == 0)
+    {
+      throw std::runtime_error("unknown argument: " + k);
     }
     else
     {
-      throw std::runtime_error("unknown argument: " + k);
+      if (positional == 0)
+        a.source_ = k;
+      else if (positional == 1)
+        a.config_ = k;
+      else
+        throw std::runtime_error("unexpected positional argument: " + k);
+      ++positional;
     }
   }
   return a;
