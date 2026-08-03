@@ -14,11 +14,7 @@ class YoloOVNRT : public YoloRuntime
 private:
   ov::Core core_;
   ov::CompiledModel compiled_model_;
-  // infer_req_[0]: always allocated in constructor — used by inference().
-  // infer_req_[1]: allocated lazily on first submit() call.
-  // Keeping them separate prevents eager allocation from doubling the model
-  // weight footprint in L3 for callers that only use inference().
-  ov::InferRequest infer_req_[2];
+  std::array<ov::InferRequest, 2> infer_req_;
   bool pipeline_ready_ = false;
   int submit_idx_ = 0;
   int collect_idx_ = 0;

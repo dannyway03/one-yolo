@@ -13,27 +13,27 @@
 #endif
 namespace yolo {
 
-YoloTask::YoloTask(YoloConfig cfg) : _cfg(std::move(cfg))
+YoloTask::YoloTask(YoloConfig cfg) : cfg_(std::move(cfg))
 {
-  switch (_cfg.target_rt_)
+  switch (cfg_.target_rt_)
   {
 #ifdef BUILD_WITH_ORT
     case YoloTargetRT::ORT_CPU:
-      _rt = std::make_shared<yolo::YoloONNXRT>(_cfg.model_path_, false);
+      rt_ = std::make_shared<yolo::YoloONNXRT>(cfg_.model_path_, false);
       break;
     case YoloTargetRT::ORT_CUDA:
-      _rt = std::make_shared<yolo::YoloONNXRT>(_cfg.model_path_, true);
+      rt_ = std::make_shared<yolo::YoloONNXRT>(cfg_.model_path_, true);
       break;
 #endif
 #ifdef BUILD_WITH_OVN
     case YoloTargetRT::OVN_AUTO:
-      _rt = std::make_shared<yolo::YoloOVNRT>(_cfg.model_path_, "AUTO");
+      rt_ = std::make_shared<yolo::YoloOVNRT>(cfg_.model_path_, "AUTO");
       break;
     case YoloTargetRT::OVN_CPU:
-      _rt = std::make_shared<yolo::YoloOVNRT>(_cfg.model_path_, "CPU");
+      rt_ = std::make_shared<yolo::YoloOVNRT>(cfg_.model_path_, "CPU");
       break;
     case YoloTargetRT::OVN_GPU:
-      _rt = std::make_shared<yolo::YoloOVNRT>(_cfg.model_path_, "GPU");
+      rt_ = std::make_shared<yolo::YoloOVNRT>(cfg_.model_path_, "GPU");
       break;
 #endif
     default:
@@ -45,80 +45,71 @@ YoloTask::YoloTask(YoloConfig cfg) : _cfg(std::move(cfg))
 YoloTask::~YoloTask() = default;
 
 auto
-YoloTask::preprocess_one(const cv::Mat& image) -> cv::Mat
+YoloTask::preprocessOne(const cv::Mat& image) -> cv::Mat
 {
   assert(!image.empty());
 
-  // different for classification task
-  if (_cfg.task_ == YoloTaskType::CLS)
+  if (cfg_.task_ == YoloTaskType::CLS)
   {
     cv::Mat resized;
-    cv::resize(image, resized, cv::Size(_cfg.input_w_, _cfg.input_h_));
-    _orig_sizes.push_back(image.size());
-    _letterbox_infos.push_back(LetterBoxInfo{1.0f, 0, 0});
-    _input_images.push_back(resized);
-
-    // [3, _cfg.input_h_, _cfg.input_w_]
+    cv::resize(image, resized, cv::Size(cfg_.input_w_, cfg_.input_h_));
+    orig_sizes_.push_back(image.size());
+    letterbox_infos_.push_back(LetterBoxInfo{1.0f, 0, 0});
+    input_images_.push_back(resized);
     return resized;
   }
 
   LetterBoxInfo info{};
   YoloUtils utils;
-  cv::Mat lb = utils.letterbox(image, _cfg.input_w_, _cfg.input_h_, info);
-  _orig_sizes.push_back(image.size());
-  _letterbox_infos.push_back(info);
-  _input_images.push_back(lb);
-  // [3, _cfg.input_h_, _cfg.input_w_]
+  cv::Mat lb = utils.letterbox(image, cfg_.input_w_, cfg_.input_h_, info);
+  orig_sizes_.push_back(image.size());
+  letterbox_infos_.push_back(info);
+  input_images_.push_back(lb);
   return lb;
 }
 
 auto
 YoloTask::preprocess(const std::vector<cv::Mat>& images) -> cv::Mat
 {
-  _orig_sizes.clear();
-  _letterbox_infos.clear();
-  _input_images.clear();
+  orig_sizes_.clear();
+  letterbox_infos_.clear();
+  input_images_.clear();
 
   std::vector<cv::Mat> letterboxes;
+  letterboxes.reserve(images.size());
   for (const auto& image : images)
-    letterboxes.push_back(preprocess_one(image));
+    letterboxes.push_back(preprocessOne(image));
 
-  // [batch, 3, _cfg.input_h_, _cfg.input_w_]
   cv::Mat blob;
-  cv::dnn::blobFromImages(letterboxes, blob, _cfg.scale_f_, cv::Size(), cv::Scalar(), _cfg.rgb_, false);
+  cv::dnn::blobFromImages(letterboxes, blob, cfg_.scale_f_, cv::Size(), cv::Scalar(), cfg_.rgb_, false);
 
-  // different for classification task
-  if (_cfg.task_ == YoloTaskType::CLS && _cfg.mean_.size() == 3 && _cfg.std_.size() == 3)
+  if (cfg_.task_ == YoloTaskType::CLS && cfg_.mean_.size() == 3 && cfg_.std_.size() == 3)
   {
-    int N = blob.size[0];
-    int C = blob.size[1];
-    int H = blob.size[2];
-    int W = blob.size[3];
+    int batch_size = blob.size[0];
+    int ch_nr = blob.size[1];
+    int height = blob.size[2];
+    int width = blob.size[3];
 
-    for (int n = 0; n < N; ++n)
+    for (int n = 0; n < batch_size; ++n)
     {
-      for (int c = 0; c < C; ++c)
+      for (int c = 0; c < ch_nr; ++c)
       {
         auto* ptr = blob.ptr<float>(n, c);
-        float m = _cfg.mean_[c];
-        float s = _cfg.std_[c];
+        float m = cfg_.mean_[c];
+        float s = cfg_.std_[c];
 
-        int spatial = H * W;
+        int spatial = height * width;
         for (int i = 0; i < spatial; ++i)
           ptr[i] = (ptr[i] - m) / s;
       }
     }
   }
 
-  // NHWC as input
-  if (!_cfg.nchw_)
+  if (!cfg_.nchw_)
   {
     cv::Mat blob_nhwc;
     std::vector<int> order = {0, 2, 3, 1};
-    // NCHW -> NHWC
     cv::transposeND(blob, order, blob_nhwc);
-
-    // [batch, _cfg.input_h_, _cfg.input_w_, 3]
     return blob_nhwc;
   }
 
@@ -128,7 +119,7 @@ YoloTask::preprocess(const std::vector<cv::Mat>& images) -> cv::Mat
 auto
 YoloTask::inference(const cv::Mat& blob) -> std::vector<cv::Mat>
 {
-  return (*_rt).inference(blob);
+  return (*rt_).inference(blob);
 }
 
 auto
@@ -138,7 +129,7 @@ YoloTask::postprocess(const std::vector<cv::Mat>& raw_outputs, int batch_size) -
   for (int i = 0; i < batch_size; ++i)
   {
     /* MUST override in child class(extract structured data to fill YoloResult) */
-    postprocess_one(raw_outputs, i, _orig_sizes[i], _letterbox_infos[i], results[i]);
+    postprocessOne(raw_outputs, i, orig_sizes_[i], letterbox_infos_[i], results[i]);
   }
   return results;
 }
@@ -164,25 +155,25 @@ YoloTask::run(const std::vector<cv::Mat>& images) -> std::vector<yolo::YoloResul
     auto& r = results[i];
 
     /* note, it's batch cost time here since we do not know the time for single inference. */
-    r.speed.push_back(std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() /
-                      1000.0); // preprocess time(ms)
-    r.speed.push_back(std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count() /
-                      1000.0); // inference time(ms)
-    r.speed.push_back(std::chrono::duration_cast<std::chrono::microseconds>(t4 - t3).count() /
-                      1000.0); // postprocess time(ms)
+    r.speed_.push_back(std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count() /
+                       1000.0); // preprocess time(ms)
+    r.speed_.push_back(std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count() /
+                       1000.0); // inference time(ms)
+    r.speed_.push_back(std::chrono::duration_cast<std::chrono::microseconds>(t4 - t3).count() /
+                       1000.0); // postprocess time(ms)
 
-    r.id = i; // batch id
-    r.names = _cfg.names_;
-    r.batch_size = _cfg.batch_size_;
-    r.task = _cfg.task_;
-    r.version = _cfg.version_;
-    r.target_rt = _cfg.target_rt_;
-    r.input_w = _cfg.input_w_;
-    r.input_h = _cfg.input_h_;
-    r.letterbox_info = _letterbox_infos[i];
-    r.input_image = _input_images[i];
-    r.orig_size = _orig_sizes[i];
-    r.orig_image = images[i];
+    r.id_ = i; // batch id
+    r.names_ = cfg_.names_;
+    r.batch_size_ = cfg_.batch_size_;
+    r.task_ = cfg_.task_;
+    r.version_ = cfg_.version_;
+    r.target_rt_ = cfg_.target_rt_;
+    r.input_w_ = cfg_.input_w_;
+    r.input_h_ = cfg_.input_h_;
+    r.letterbox_info_ = letterbox_infos_[i];
+    r.input_image_ = input_images_[i];
+    r.orig_size_ = orig_sizes_[i];
+    r.orig_image_ = images[i];
   }
 
   /* return results */

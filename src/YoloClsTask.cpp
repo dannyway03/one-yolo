@@ -35,7 +35,7 @@ YoloClsTask::softmax(const cv::Mat& logits) -> cv::Mat
 }
 
 auto
-YoloClsTask::is_prob_distribution(const cv::Mat& out, double eps) -> bool
+YoloClsTask::isProbDistribution(const cv::Mat& out, double eps) -> bool
 {
   assert(out.dims == 2);
 
@@ -58,8 +58,8 @@ YoloClsTask::is_prob_distribution(const cv::Mat& out, double eps) -> bool
 }
 
 void
-YoloClsTask::postprocess_one(const std::vector<cv::Mat>& raw_outputs, int batch_id, cv::Size orig_size,
-                             LetterBoxInfo lb_info, YoloResult& result)
+YoloClsTask::postprocessOne(const std::vector<cv::Mat>& raw_outputs, int batch_id, cv::Size orig_size,
+                            LetterBoxInfo lb_info, YoloResult& result)
 {
   std::vector<float> scores;
   std::vector<int> cls_ids;
@@ -68,7 +68,7 @@ YoloClsTask::postprocess_one(const std::vector<cv::Mat>& raw_outputs, int batch_
 
   /* just 1 output head for classification task in Yolo */
   auto& raw_output = raw_outputs[0];
-  auto output = is_prob_distribution(raw_output) ? raw_output : softmax(raw_output);
+  auto output = isProbDistribution(raw_output) ? raw_output : softmax(raw_output);
 
   int num_classes = 0;
   const float* scores_ptr = nullptr;
@@ -92,12 +92,12 @@ YoloClsTask::postprocess_one(const std::vector<cv::Mat>& raw_outputs, int batch_
     return;
   }
 
-  assert(num_classes == _cfg.num_classes_);
+  assert(num_classes == cfg_.num_classes_);
   std::vector<int> indices(num_classes);
   std::iota(indices.begin(), indices.end(), 0);
 
   std::sort(indices.begin(), indices.end(),
-            [&](int a, int b)
+            [&](int a, int b) -> bool
             {
               return scores_ptr[a] > scores_ptr[b];
             });
@@ -114,8 +114,8 @@ YoloClsTask::postprocess_one(const std::vector<cv::Mat>& raw_outputs, int batch_
   /* fill YoloResult with YoloClsObjs from high score to low */
   for (size_t i = 0; i < num_classes; i++)
   {
-    YoloClsObj cls_obj{cls_ids[i], scores[i], _cfg.names_[cls_ids[i]]};
-    result.classes.emplace_back(cls_obj);
+    YoloClsObj cls_obj{cls_ids[i], scores[i], cfg_.names_[cls_ids[i]]};
+    result.classes_.emplace_back(cls_obj);
   }
 }
 

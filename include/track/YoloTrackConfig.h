@@ -17,18 +17,18 @@ enum class YoloTrackLoc
 
 struct YoloTrackConfig
 {
-  YoloTrackAlgo algo = YoloTrackAlgo::SORT;
-  YoloTrackLoc loc = YoloTrackLoc::BOTTOM_CENTER;
+  YoloTrackAlgo algo_ = YoloTrackAlgo::SORT;
+  YoloTrackLoc loc_ = YoloTrackLoc::BOTTOM_CENTER;
 
-  float loc_f = 0.5f; // valid only if loc == YoloTrackLoc::BOTTOM_CUSTOM
-  int max_miss = 1;
-  int min_hits = 3;
-  float iou_thresh = 0.8f;
+  float loc_f_ = 0.5f; // valid only if loc == YoloTrackLoc::BOTTOM_CUSTOM
+  int max_miss_ = 1;
+  int min_hits_ = 3;
+  float iou_thresh_ = 0.8f;
 };
 
-std::string
-to_string(YoloTrackAlgo algo);
-std::string
-to_string(YoloTrackLoc loc);
+auto
+toString(YoloTrackAlgo algo) -> std::string;
+auto
+toString(YoloTrackLoc loc) -> std::string;
 
 } // namespace yolo

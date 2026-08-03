@@ -34,7 +34,7 @@ main(int argc, char* argv[]) -> int
                    return !single_shot && (key != 27);
                    /*
                     * auto top1       = result.top1();
-                    * auto top1_conf  = result.top1_conf();
+                    * auto top1Conf  = result.top1Conf();
                     * auto top1_label = result.top1_label();
                     * auto top5       = result.top5();
                     * auto top5_confs = result.top5_confs();

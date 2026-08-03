@@ -13,11 +13,11 @@ class YoloTask
 private:
 
 protected:
-  YoloConfig _cfg;
-  std::vector<cv::Size> _orig_sizes;
-  std::vector<LetterBoxInfo> _letterbox_infos;
-  std::vector<cv::Mat> _input_images;
-  std::shared_ptr<YoloRuntime> _rt = nullptr;
+  YoloConfig cfg_;
+  std::vector<cv::Size> orig_sizes_;
+  std::vector<LetterBoxInfo> letterbox_infos_;
+  std::vector<cv::Mat> input_images_;
+  std::shared_ptr<YoloRuntime> rt_ = nullptr;
 
   /**
    * @brief
@@ -26,8 +26,8 @@ protected:
    * @param images input images with batch mode.
    * @return a 4D matrix.
    */
-  virtual std::vector<cv::Mat>
-  inference(const cv::Mat& blob);
+  virtual auto
+  inference(const cv::Mat& blob) -> std::vector<cv::Mat>;
 
   /**
    * @brief
@@ -36,8 +36,8 @@ protected:
    * @param image single image.
    * @return preprocessed image (scale/padding).
    */
-  virtual cv::Mat
-  preprocess_one(const cv::Mat& image);
+  virtual auto
+  preprocessOne(const cv::Mat& image) -> cv::Mat;
 
   /**
    * @brief
@@ -53,8 +53,8 @@ protected:
    * MUST override in child classes.
    */
   virtual void
-  postprocess_one(const std::vector<cv::Mat>& raw_outputs, int batch_id, cv::Size orig_size, LetterBoxInfo lb_info,
-                  YoloResult& result) = 0;
+  postprocessOne(const std::vector<cv::Mat>& raw_outputs, int batch_id, cv::Size orig_size, LetterBoxInfo lb_info,
+                 YoloResult& result) = 0;
 
 public:
   YoloTask(YoloConfig cfg);
@@ -63,7 +63,7 @@ public:
   [[nodiscard]] auto
   runtime() const -> std::shared_ptr<YoloRuntime>
   {
-    return _rt;
+    return rt_;
   }
 
   auto
@@ -78,8 +78,8 @@ public:
    * @param images input images with batch mode.
    * @return a list of `YoloResult`, has the same size of input images.
    */
-  std::vector<yolo::YoloResult>
-  run(const std::vector<cv::Mat>& images);
+  auto
+  run(const std::vector<cv::Mat>& images) -> std::vector<yolo::YoloResult>;
 
   /**
    * @brief
@@ -89,8 +89,8 @@ public:
    * @return a list of `YoloResult`, has the same size of input images.
    *
    */
-  std::vector<yolo::YoloResult>
-  operator()(const std::vector<cv::Mat>& images);
+  auto
+  operator()(const std::vector<cv::Mat>& images) -> std::vector<yolo::YoloResult>;
 };
 
 } // namespace yolo

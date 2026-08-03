@@ -11,7 +11,11 @@ namespace app {
 [[nodiscard]] inline auto
 resolveRuntime(const std::string& backend, const std::string& device) -> yolo::YoloTargetRT
 {
-  auto lower = [](std::string s) { std::transform(s.begin(), s.end(), s.begin(), ::tolower); return s; };
+  auto lower = [](std::string s) -> std::string
+  {
+    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+    return s;
+  };
   const auto b = lower(backend);
   const auto d = lower(device);
   if (b == "ort")

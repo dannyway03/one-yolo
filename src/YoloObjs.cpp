@@ -4,7 +4,7 @@
 namespace cv {
 
 void
-to_json(json& j, const cv::Point& obj)
+to_json(json& j, const cv::Point& obj) // NOLINT
 {
   j = json{
     {"x", obj.x},
@@ -13,7 +13,7 @@ to_json(json& j, const cv::Point& obj)
 }
 
 void
-to_json(json& j, const cv::Rect& obj)
+to_json(json& j, const cv::Rect& obj) // NOLINT
 {
   j = json{
     {     "x",      obj.x},
@@ -27,25 +27,25 @@ to_json(json& j, const cv::Rect& obj)
 
 namespace yolo {
 
-[[maybe_unused]] void
+void
 to_json(json& j, const YoloClsObj& obj)
 {
   j = json{
-    {"cls_id", obj.cls_id},
-    {  "conf",   obj.conf},
-    { "label",  obj.label}
+    {"cls_id_", obj.cls_id_},
+    {   "conf",   obj.conf_},
+    {  "label",  obj.label_}
   };
 }
 
-[[maybe_unused]] void
+void
 to_json(json& j, const YoloDetObj& obj)
 {
   j = json{
-    {     "box",      obj.box},
-    {  "cls_id",   obj.cls_id},
-    {    "conf",     obj.conf},
-    {   "label",    obj.label},
-    {"track_id", obj.track_id}
+    {     "box",      obj.box_},
+    { "cls_id_",   obj.cls_id_},
+    {    "conf",     obj.conf_},
+    {   "label",    obj.label_},
+    {"track_id", obj.track_id_}
   };
 }
 

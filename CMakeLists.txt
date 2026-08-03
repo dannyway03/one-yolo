@@ -10,6 +10,7 @@ cmake_minimum_required(VERSION 3.10)
 project(one-yolo VERSION 1.0)
 
 set(CMAKE_CXX_STANDARD 17)
+execute_process(COMMAND ln -sf "${CMAKE_BINARY_DIR}/compile_commands.json" "${CMAKE_SOURCE_DIR}/compile_commands.json")
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -fPIC -w -fdiagnostics-color=always -pthread")
 

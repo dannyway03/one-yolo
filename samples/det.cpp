@@ -18,42 +18,42 @@ fmtMs(float ms) -> std::string
 static void
 drawOverlay(cv::Mat& img, const YoloResult& result, bool tracking)
 {
-  const float pre   = result.speed.size() > 0 ? result.speed[0] : 0.f;
-  const float inf   = result.speed.size() > 1 ? result.speed[1] : 0.f;
-  const float post  = result.speed.size() > 2 ? result.speed[2] : 0.f;
+  const float pre = !result.speed_.empty() ? result.speed_[0] : 0.f;
+  const float inf = result.speed_.size() > 1 ? result.speed_[1] : 0.f;
+  const float post = result.speed_.size() > 2 ? result.speed_[2] : 0.f;
   const float total = pre + inf + post;
-  const int fps     = total > 0.f ? static_cast<int>(1000.f / total) : 0;
+  const int fps = total > 0.f ? static_cast<int>(1000.f / total) : 0;
 
-  const std::string line1 = toString(result.target_rt) + "  |  " + (tracking ? "SORT" : "no-track");
-  const std::string line2 = "pre " + fmtMs(pre) + "  inf " + fmtMs(inf) + "  post " + fmtMs(post) +
-                             " ms  |  " + std::to_string(fps) + " FPS  |  " +
-                             std::to_string(static_cast<int>(result.detections.size())) + " det";
+  const std::string line1 = toString(result.target_rt_) + "  |  " + (tracking ? "SORT" : "no-track");
+  const std::string line2 = "pre " + fmtMs(pre) + "  inf " + fmtMs(inf) + "  post " + fmtMs(post) + " ms  |  " +
+                            std::to_string(fps) + " FPS  |  " +
+                            std::to_string(static_cast<int>(result.detections_.size())) + " det";
 
-  constexpr int    font      = cv::FONT_HERSHEY_SIMPLEX;
-  constexpr double fscale    = 0.55;
-  constexpr int    thick     = 1;
-  constexpr int    pad       = 6;
-  constexpr int    line_gap  = 4;
+  constexpr int kFont = cv::FONT_HERSHEY_SIMPLEX;
+  constexpr double kFscale = 0.55;
+  constexpr int kThick = 1;
+  constexpr int kPad = 6;
+  constexpr int kLineGap = 4;
 
   int base = 0;
-  const auto sz1 = cv::getTextSize(line1, font, fscale, thick, &base);
-  const auto sz2 = cv::getTextSize(line2, font, fscale, thick, &base);
+  const auto sz1 = cv::getTextSize(line1, kFont, kFscale, kThick, &base);
+  const auto sz2 = cv::getTextSize(line2, kFont, kFscale, kThick, &base);
 
-  const int bar_w = std::min(std::max(sz1.width, sz2.width) + pad * 2, img.cols);
-  const int bar_h = std::min(sz1.height + sz2.height + line_gap + pad * 2, img.rows);
+  const int bar_w = std::min(std::max(sz1.width, sz2.width) + kPad * 2, img.cols);
+  const int bar_h = std::min(sz1.height + sz2.height + kLineGap + kPad * 2, img.rows);
 
-  cv::Mat roi  = img(cv::Rect(0, 0, bar_w, bar_h));
+  cv::Mat roi = img(cv::Rect(0, 0, bar_w, bar_h));
   cv::Mat dark = cv::Mat::zeros(roi.size(), roi.type());
   cv::addWeighted(roi, 0.35, dark, 0.65, 0, roi);
 
-  auto put = [&](const std::string& text, cv::Point pt)
+  auto put = [&](const std::string& text, cv::Point pt) -> void
   {
-    cv::putText(img, text, pt + cv::Point(1, 1), font, fscale, {0, 0, 0}, thick + 1, cv::LINE_AA);
-    cv::putText(img, text, pt, font, fscale, {255, 255, 255}, thick, cv::LINE_AA);
+    cv::putText(img, text, pt + cv::Point(1, 1), kFont, kFscale, {0, 0, 0}, kThick + 1, cv::LINE_AA);
+    cv::putText(img, text, pt, kFont, kFscale, {255, 255, 255}, kThick, cv::LINE_AA);
   };
 
-  put(line1, {pad, pad + sz1.height});
-  put(line2, {pad, pad + sz1.height + line_gap + sz2.height});
+  put(line1, {kPad, kPad + sz1.height});
+  put(line2, {kPad, kPad + sz1.height + kLineGap + sz2.height});
 }
 
 auto

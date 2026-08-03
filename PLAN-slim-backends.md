@@ -1,6 +1,7 @@
 # Plan: Slim one-yolo — ORT + OVN, DET + CLS, JSON config
 
 **Goal**: Two independent workstreams executed in order.
+
 1. **Phase 1** — delete dead backends (OpenCV-DNN, TRT, RKNN), dead tasks (SEG, POSE, OBB).  
    Tracker subsystem is **kept**.
 2. **Phase 2** — replace the wall of CLI flags with a single JSON config file;
@@ -59,6 +60,7 @@ git rm samples/seg.cpp samples/pose.cpp samples/obb.cpp
 ### 1-D  Edit `include/YoloConfig.h` — trim enums
 
 **`YoloTaskType`** — replace body with:
+
 ```cpp
 enum class YoloTaskType
 {
@@ -68,6 +70,7 @@ enum class YoloTaskType
 ```
 
 **`YoloTargetRT`** — replace body with:
+
 ```cpp
 enum class YoloTargetRT
 {
@@ -86,6 +89,7 @@ enum class YoloTargetRT
 ### 1-E  Edit `src/Yolo.cpp` — remove dead task includes and switch cases
 
 Remove these three includes (top of file):
+
 ```cpp
 #include "YoloObbTask.h"
 #include "YoloPoseTask.h"
@@ -93,6 +97,7 @@ Remove these three includes (top of file):
 ```
 
 Remove these three switch cases:
+
 ```cpp
     case YoloTaskType::SEG:
       task_ = std::make_shared<yolo::YoloSegTask>(cfg);
@@ -112,11 +117,13 @@ Remove these three switch cases:
 ### 1-F  Edit `src/YoloTask.cpp` — remove dead backend includes and switch cases
 
 Remove (unconditional include, line 8):
+
 ```cpp
 #include "YoloOpenCVRT.h"
 ```
 
 Remove (guarded blocks):
+
 ```cpp
 #ifdef BUILD_WITH_TRT
   #include "trt/YoloTRT.h"
@@ -127,6 +134,7 @@ Remove (guarded blocks):
 ```
 
 Remove from the `switch (_cfg.target_rt_)` statement:
+
 ```cpp
     case YoloTargetRT::OPENCV_CPU:
       _rt = std::make_shared<yolo::YoloOpenCVRT>(_cfg.model_path_, false);
@@ -135,6 +143,7 @@ Remove from the `switch (_cfg.target_rt_)` statement:
       _rt = std::make_shared<yolo::YoloOpenCVRT>(_cfg.model_path_, true);
       break;
 ```
+
 ```cpp
 #ifdef BUILD_WITH_TRT
     case YoloTargetRT::TRT:
@@ -142,6 +151,7 @@ Remove from the `switch (_cfg.target_rt_)` statement:
       break;
 #endif
 ```
+
 ```cpp
 #ifdef BUILD_WITH_RKN
     case YoloTargetRT::RKNN:
@@ -160,36 +170,42 @@ Remove from the `switch (_cfg.target_rt_)` statement:
 > `find_package(OpenCV REQUIRED)` or its `include_directories` / `link_libraries` lines.
 
 Remove glob lines:
+
 ```cmake
 file(GLOB_RECURSE TRACK_SRCS "src/track/*.cpp")
-file(GLOB_RECURSE TRT_SRCS   "src/trt/*.cpp")
-file(GLOB_RECURSE RKN_SRCS   "src/rkn/*.cpp")
+file(GLOB_RECURSE TRT_SRCS "src/trt/*.cpp")
+file(GLOB_RECURSE RKN_SRCS "src/rkn/*.cpp")
 ```
 
 > TRACK_SRCS is being removed from the glob list because we will add the track sources explicitly
 > in step 1-G-addback below — do not lose them.
 
 After removing the glob, add the track sources explicitly:
+
 ```cmake
 file(GLOB_RECURSE TRACK_SRCS "src/track/*.cpp")
 list(APPEND ONE_YOLO_DEPEND_SRCS ${TRACK_SRCS})
 ```
+
 Place this immediately after the OVN `endif()` block (line ~67).
 
 Remove the commented TRT option line:
+
 ```cmake
 #option(BUILD_WITH_TRT "enable TensorRT(Nvidia/CUDA Platform)?" OFF)
 ```
 
 Remove the entire TRT `if` block:
+
 ```cmake
 if(BUILD_WITH_TRT)
-    ...
-    list(APPEND ONE_YOLO_DEPEND_SRCS ${TRT_SRCS})
+...
+list(APPEND ONE_YOLO_DEPEND_SRCS ${TRT_SRCS})
 endif()
 ```
 
 Remove the entire RKN `if` block (including its `link_directories` and `include_directories`):
+
 ```cmake
 if(BUILD_WITH_RKN)
     include_directories("/sd/z/rknnrt/include")
@@ -208,6 +224,7 @@ Also verify: `grep -n "TRACK_SRCS" CMakeLists.txt` → exactly 2 lines (the glob
 ### 1-H  Edit `samples/CMakeLists.txt` — remove dead sample targets
 
 Replace entire file content with:
+
 ```cmake
 add_executable(det "det.cpp")
 target_link_libraries(det ${PROJECT_NAME})
@@ -223,6 +240,7 @@ target_link_libraries(cls ${PROJECT_NAME})
 ### 1-I  Edit `samples/common.hpp` — remove dead backend resolver
 
 In `resolveRuntime()`, remove the `dnn` branch:
+
 ```cpp
   if (backend == "dnn")
     return (device == "cuda") ? yolo::YoloTargetRT::OPENCV_CUDA : yolo::YoloTargetRT::OPENCV_CPU;
@@ -243,12 +261,14 @@ In `resolveRuntime()`, remove the `dnn` branch:
 > no behaviour change. `tools/bench.cpp` keeps its model flags until Phase 2.
 
 **1-J-1  `src/YoloConfig.cpp`** — remove dead switch cases:
+
 - In `toString(YoloTaskType)`: remove the `SEG`, `POSE`, `OBB` cases.
 - In `toString(YoloTargetRT)`: remove the `OPENCV_CPU`, `OPENCV_CUDA`, `TRT`, `RKNN` cases.
 
 **1-J-2  `src/YoloResult.cpp`** — remove dead task branches and guards:
+
 - In `plot()`: remove the `SEG`, `POSE`, `OBB` cases.
-- In `to_csv()`: remove the `SEG`, `POSE`, `OBB` cases.
+- In `toCsv()`: remove the `SEG`, `POSE`, `OBB` cases.
 - In `to_json()`: remove the `SEG`, `POSE`, `OBB` cases.
 - In `info()`: remove the `else if (task == YoloTaskType::OBB)` branch.
 - In `boxes()`, `cls_ids()`, `confs()`, `labels()`, `track_ids()`, `track_points()`: trim the
@@ -259,10 +279,13 @@ In `resolveRuntime()`, remove the `dnn` branch:
 **1-J-3  `src/track/YoloTracker.cpp`** — remove dead task branches (SEG/POSE).
 
 **1-J-4  `tools/bench.cpp`** — remove dead enum references only:
+
 - Remove `OPENCV_CPU`/`OPENCV_CUDA` from the runtime resolver and `SEG`/`POSE`/`OBB` from the
   task resolver. Keep all model flags (`--model`, `--version`, etc.) — those are removed in Phase 2.
 
-**Gate 1-J**: `grep -rn "YoloTaskType::SEG\|YoloTaskType::POSE\|YoloTaskType::OBB\|YoloTargetRT::OPENCV\|YoloTargetRT::TRT\|YoloTargetRT::RKNN" src/` → 0 lines.
+**Gate 1-J**:
+`grep -rn "YoloTaskType::SEG\|YoloTaskType::POSE\|YoloTaskType::OBB\|YoloTargetRT::OPENCV\|YoloTargetRT::TRT\|YoloTargetRT::RKNN" src/` →
+0 lines.
 
 ---
 
@@ -278,6 +301,7 @@ cmake --build build -- -j$(nproc) 2>&1 | tail -40
 ```
 
 **Gate 1-J (hard stop — do NOT proceed if this fails)**:
+
 - 0 compiler errors
 - `build/libone-yolo.so` exists
 - `build/bench` exists
@@ -313,6 +337,7 @@ The new CLI contract is:
 ```
 
 For `bench` specifically:
+
 ```
 bench  <config.json>  --img <path>  [--backend ort|ovn]  [--device cpu|gpu|auto|cuda]
        [--iter N]  [--pipeline]
@@ -332,11 +357,13 @@ git rm -r include/nlohmann/
 ```
 
 In `CMakeLists.txt`, add after the existing `find_package` blocks:
+
 ```cmake
 find_package(nlohmann_json REQUIRED)
 ```
 
 Add to `target_link_libraries` for the main library target:
+
 ```cmake
 target_link_libraries(${PROJECT_NAME} ${ONE_YOLO_DEPEND_LIBS} nlohmann_json::nlohmann_json)
 ```
@@ -369,6 +396,7 @@ Every model ships with a `.json` sidecar. Required fields:
 ```
 
 Notes:
+
 - `model_path` relative → resolved relative to the JSON file's directory.
 - `version` maps to `YoloVersion`: `"yolo5"`, `"yolo5u"`, `"yolo8"`, `"yolo11"`, `"yolo26"`,
   `"yolox"` (alias for `yolo5` decoder + `scale_f: 1.0`).
@@ -387,6 +415,7 @@ This schema is documentation only — no validation code beyond what nlohmann th
 Add `#include <nlohmann/json.hpp>` at the top of the file (after existing includes).
 
 Add this declaration inside `struct YoloConfig` (after the existing member declarations):
+
 ```cpp
   [[nodiscard]] static auto
   from_json(const std::string& json_path) -> YoloConfig;
@@ -395,6 +424,7 @@ Add this declaration inside `struct YoloConfig` (after the existing member decla
 **Edit `src/YoloConfig.cpp`**:
 
 Add the implementation (find a suitable place after existing functions):
+
 ```cpp
 auto
 YoloConfig::from_json(const std::string& json_path) -> YoloConfig
@@ -454,6 +484,7 @@ YoloConfig::from_json(const std::string& json_path) -> YoloConfig
 ```
 
 Also add these includes at the top of `src/YoloConfig.cpp` (if not already present):
+
 ```cpp
 #include <filesystem>
 #include <fstream>
@@ -461,6 +492,7 @@ Also add these includes at the top of `src/YoloConfig.cpp` (if not already prese
 ```
 
 **Gate 2-C**:
+
 - `grep "from_json" include/YoloConfig.h` → 1 line
 - `grep "from_json" src/YoloConfig.cpp` → at least 1 line
 
@@ -469,9 +501,11 @@ Also add these includes at the top of `src/YoloConfig.cpp` (if not already prese
 ### 2-D  Rewrite `samples/common.hpp`
 
 The new `CliArgs` struct, `parseArgs`, `buildYoloConfig`, `printUsage` must implement
-the contract: `[binary] <source> <config.json> [--backend ort|ovn] [--device cpu|gpu|auto|cuda] [--no-track] [--scale N]`.
+the contract:
+`[binary] <source> <config.json> [--backend ort|ovn] [--device cpu|gpu|auto|cuda] [--no-track] [--scale N]`.
 
 Replace the entire `CliArgs` struct with:
+
 ```cpp
 struct CliArgs
 {
@@ -488,6 +522,7 @@ Remove from `CliArgs`: `model_`, `version_`, `input_w_`, `input_h_`, `classes_`,
 `conf_`, `iou_`, `no_json_`, `no_csv_`, `names_`.
 
 Replace `buildYoloConfig()` with:
+
 ```cpp
 [[nodiscard]] inline auto
 buildYoloConfig(const CliArgs& a, yolo::YoloTaskType /*task*/) -> yolo::YoloConfig
@@ -503,6 +538,7 @@ but `from_json` already sets the task from the JSON — the parameter is ignored
 
 Replace `parseArgs()` — new version accepts positional args `source` and `config` plus
 optional flags `--backend`, `--device`, `--no-track`, `--scale`:
+
 ```cpp
 [[nodiscard]] inline auto
 parseArgs(int argc, char** argv) -> CliArgs
@@ -537,6 +573,7 @@ parseArgs(int argc, char** argv) -> CliArgs
 ```
 
 Replace `printUsage()`:
+
 ```cpp
 inline void
 printUsage(const char* app_name, const char* task_desc)
@@ -556,7 +593,9 @@ Update `runLoop()` — change guard from `a.source_.empty()` check (unchanged),
 but remove all `no_json_` / `no_csv_` references inside the loop body.  
 The `runLoop` function itself doesn't reference those — they are in the sample `main()` bodies.
 
-**Gate 2-D**: `grep -n "no_json\|no_csv\|model_\|version_\|input_w_\|input_h_\|classes_\|conf_\|iou_\|names_" samples/common.hpp` → 0 lines.
+**Gate 2-D**:
+`grep -n "no_json\|no_csv\|model_\|version_\|input_w_\|input_h_\|classes_\|conf_\|iou_\|names_" samples/common.hpp` → 0
+lines.
 
 > **Note (gate over-match, resolved 2026-08-02)**: the literal step-2-D pattern above matches
 > `t.iou_thresh = 0.6f;` in `buildTrackerConfig()`. That field is **live SORT-tracker config**
@@ -571,26 +610,29 @@ The `runLoop` function itself doesn't reference those — they are in the sample
 **`samples/det.cpp`** — remove `no_json_` and `no_csv_` usage:
 
 Remove these lines from inside the lambda:
+
 ```cpp
                    if (!a.no_json_)
                      result.to_json(/*print=*/true);
                    if (!a.no_csv_)
-                     result.to_csv(/*print=*/true);
+                     result.toCsv(/*print=*/true);
 ```
 
 **`samples/cls.cpp`** — remove `no_json_` and `no_csv_` usage:
 
 Remove these lines from inside the lambda:
+
 ```cpp
                    if (!a.no_json_)
                      result.to_json(/*print=*/true);
                    if (!a.no_csv_)
-                     result.to_csv(/*print=*/true);
+                     result.toCsv(/*print=*/true);
 ```
 
 Also update the `argc < 2` guard and `a.model_.empty()` guard in both files:
 
 In `det.cpp` replace:
+
 ```cpp
     if (a.model_.empty())
     {
@@ -598,7 +640,9 @@ In `det.cpp` replace:
       return 1;
     }
 ```
+
 with:
+
 ```cpp
     if (a.config_.empty())
     {
@@ -619,12 +663,14 @@ Same pattern in `cls.cpp` (`a.model_` → `a.config_`).
 `--pipeline`, `--img`, `--precision` (if present), `--classes`, `--input-w`, `--input-h`, `--conf`.
 
 New contract:
+
 ```
 bench <config.json> --img <path> [--backend ort|ovn] [--device cpu|gpu|auto|cuda]
       [--iter N] [--pipeline]
 ```
 
 In `bench.cpp`:
+
 - Change `struct BenchArgs` (or equivalent): replace `model_`, `version_`, `classes_`,
   `input_w_`, `input_h_`, `conf_` with a single `config_` field.
 - In `parseArgs` (or inline arg loop): first positional becomes `config_`; remove flags
@@ -654,6 +700,7 @@ cmake --build build -- -j$(nproc) 2>&1 | tail -40
 ```
 
 **Gate 2-G (hard stop)**:
+
 - 0 compiler errors
 - All four binaries exist: `libone-yolo.so`, `bench`, `samples/det`, `samples/cls`
 
@@ -662,6 +709,7 @@ cmake --build build -- -j$(nproc) 2>&1 | tail -40
 ### 2-H  Smoke test
 
 Create a minimal test config `/tmp/test.json`:
+
 ```json
 {
   "model_path":  "/path/to/yolox_nano_dec.xml",
@@ -682,6 +730,7 @@ Create a minimal test config `/tmp/test.json`:
 ```
 
 Run:
+
 ```bash
 ./build/bench /tmp/test.json --img /path/to/mot17_frame.jpg --backend ovn --device GPU --iter 5
 ```
@@ -711,58 +760,58 @@ EOF
 
 ## Acceptance gates — full summary
 
-| # | Phase | Check | Command | Pass |
-|---|-------|-------|---------|------|
-| 1-A | 1 | TRT/RKNN dirs gone | `ls include/trt include/rkn` | both fail |
-| 1-B | 1 | Task headers gone | `ls include/YoloSeg* include/YoloPose* include/YoloObb*` | all fail |
-| 1-C | 1 | Samples cleaned | `ls samples/` | only cls.cpp, det.cpp, CMakeLists.txt |
-| 1-D | 1 | Enums clean | `grep -n "OPENCV\|TRT\|RKNN\|SEG\|POSE\|OBB" include/YoloConfig.h` | 0 lines |
-| 1-E | 1 | Yolo.cpp clean | `grep -n "Seg\|Pose\|Obb" src/Yolo.cpp` | 0 lines |
-| 1-F | 1 | YoloTask.cpp clean | `grep -n "OpenCV\|TRT\|RKNN\|trt/\|rkn/" src/YoloTask.cpp` | 0 lines |
-| 1-G | 1 | CMakeLists clean | `grep -n "TRT\|RKNN\|RKN_SRCS\|TRT_SRCS" CMakeLists.txt` | 0 lines |
-| 1-H | 1 | samples/CMakeLists | `grep -n "seg\|pose\|obb" samples/CMakeLists.txt` | 0 lines |
-| 1-I | 1 | No dnn resolver | `grep -n "\"dnn\"\|OPENCV_CPU\|OPENCV_CUDA" samples/common.hpp` | 0 lines |
-| 1-J | 1 | **Build** | `cmake --build build` | 0 errors |
-| 2-A | 2 | nlohmann removed | `ls include/nlohmann` | fails |
-| 2-C | 2 | from_json exists | `grep "from_json" include/YoloConfig.h` | 1 line |
-| 2-D | 2 | common.hpp clean | `grep -n "no_json\|no_csv\|model_\|version_\|classes_" samples/common.hpp` | 0 lines |
-| 2-E | 2 | samples clean | `grep -n "no_json\|no_csv\|a\.model_" samples/det.cpp samples/cls.cpp` | 0 lines |
-| 2-F | 2 | bench clean | `grep -n "\-\-model\|\-\-version\|\-\-classes" tools/bench.cpp` | 0 lines |
-| 2-G | 2 | **Build** | `cmake --build build` | 0 errors |
-| 2-H | 2 | **Smoke test** | `bench config.json --img frame.jpg --backend ovn --device GPU --iter 5` | exit 0 |
+| #   | Phase | Check              | Command                                                                    | Pass                                  |
+|-----|-------|--------------------|----------------------------------------------------------------------------|---------------------------------------|
+| 1-A | 1     | TRT/RKNN dirs gone | `ls include/trt include/rkn`                                               | both fail                             |
+| 1-B | 1     | Task headers gone  | `ls include/YoloSeg* include/YoloPose* include/YoloObb*`                   | all fail                              |
+| 1-C | 1     | Samples cleaned    | `ls samples/`                                                              | only cls.cpp, det.cpp, CMakeLists.txt |
+| 1-D | 1     | Enums clean        | `grep -n "OPENCV\|TRT\|RKNN\|SEG\|POSE\|OBB" include/YoloConfig.h`         | 0 lines                               |
+| 1-E | 1     | Yolo.cpp clean     | `grep -n "Seg\|Pose\|Obb" src/Yolo.cpp`                                    | 0 lines                               |
+| 1-F | 1     | YoloTask.cpp clean | `grep -n "OpenCV\|TRT\|RKNN\|trt/\|rkn/" src/YoloTask.cpp`                 | 0 lines                               |
+| 1-G | 1     | CMakeLists clean   | `grep -n "TRT\|RKNN\|RKN_SRCS\|TRT_SRCS" CMakeLists.txt`                   | 0 lines                               |
+| 1-H | 1     | samples/CMakeLists | `grep -n "seg\|pose\|obb" samples/CMakeLists.txt`                          | 0 lines                               |
+| 1-I | 1     | No dnn resolver    | `grep -n "\"dnn\"\|OPENCV_CPU\|OPENCV_CUDA" samples/common.hpp`            | 0 lines                               |
+| 1-J | 1     | **Build**          | `cmake --build build`                                                      | 0 errors                              |
+| 2-A | 2     | nlohmann removed   | `ls include/nlohmann`                                                      | fails                                 |
+| 2-C | 2     | from_json exists   | `grep "from_json" include/YoloConfig.h`                                    | 1 line                                |
+| 2-D | 2     | common.hpp clean   | `grep -n "no_json\|no_csv\|model_\|version_\|classes_" samples/common.hpp` | 0 lines                               |
+| 2-E | 2     | samples clean      | `grep -n "no_json\|no_csv\|a\.model_" samples/det.cpp samples/cls.cpp`     | 0 lines                               |
+| 2-F | 2     | bench clean        | `grep -n "\-\-model\|\-\-version\|\-\-classes" tools/bench.cpp`            | 0 lines                               |
+| 2-G | 2     | **Build**          | `cmake --build build`                                                      | 0 errors                              |
+| 2-H | 2     | **Smoke test**     | `bench config.json --img frame.jpg --backend ovn --device GPU --iter 5`    | exit 0                                |
 
 ---
 
 ## Files touched — complete list
 
-| Action | Path | Phase |
-|--------|------|-------|
-| DELETE | `include/YoloOpenCVRT.h` | 1 |
-| DELETE | `src/YoloOpenCVRT.cpp` | 1 |
-| DELETE | `include/trt/YoloTRT.h` | 1 |
-| DELETE | `src/trt/YoloTRT.cpp` | 1 |
-| DELETE | `include/rkn/YoloRKNNRT.h` | 1 |
-| DELETE | `src/rkn/YoloRKNNRT.cpp` | 1 |
-| DELETE | `include/YoloSegTask.h` | 1 |
-| DELETE | `src/YoloSegTask.cpp` | 1 |
-| DELETE | `include/YoloPoseTask.h` | 1 |
-| DELETE | `src/YoloPoseTask.cpp` | 1 |
-| DELETE | `include/YoloObbTask.h` | 1 |
-| DELETE | `src/YoloObbTask.cpp` | 1 |
-| DELETE | `samples/seg.cpp` | 1 |
-| DELETE | `samples/pose.cpp` | 1 |
-| DELETE | `samples/obb.cpp` | 1 |
-| DELETE | `include/nlohmann/json.hpp` | 2 |
-| EDIT | `include/YoloConfig.h` | 1+2 |
-| EDIT | `src/Yolo.cpp` | 1 |
-| EDIT | `src/YoloTask.cpp` | 1 |
-| EDIT | `src/YoloConfig.cpp` | 2 |
-| EDIT | `CMakeLists.txt` | 1+2 |
-| EDIT | `samples/CMakeLists.txt` | 1 |
-| EDIT | `samples/common.hpp` | 2 |
-| EDIT | `samples/det.cpp` | 2 |
-| EDIT | `samples/cls.cpp` | 2 |
-| EDIT | `tools/bench.cpp` | 2 |
-| CREATE | `tools/app_common.hpp` | 2 |
+| Action | Path                        | Phase |
+|--------|-----------------------------|-------|
+| DELETE | `include/YoloOpenCVRT.h`    | 1     |
+| DELETE | `src/YoloOpenCVRT.cpp`      | 1     |
+| DELETE | `include/trt/YoloTRT.h`     | 1     |
+| DELETE | `src/trt/YoloTRT.cpp`       | 1     |
+| DELETE | `include/rkn/YoloRKNNRT.h`  | 1     |
+| DELETE | `src/rkn/YoloRKNNRT.cpp`    | 1     |
+| DELETE | `include/YoloSegTask.h`     | 1     |
+| DELETE | `src/YoloSegTask.cpp`       | 1     |
+| DELETE | `include/YoloPoseTask.h`    | 1     |
+| DELETE | `src/YoloPoseTask.cpp`      | 1     |
+| DELETE | `include/YoloObbTask.h`     | 1     |
+| DELETE | `src/YoloObbTask.cpp`       | 1     |
+| DELETE | `samples/seg.cpp`           | 1     |
+| DELETE | `samples/pose.cpp`          | 1     |
+| DELETE | `samples/obb.cpp`           | 1     |
+| DELETE | `include/nlohmann/json.hpp` | 2     |
+| EDIT   | `include/YoloConfig.h`      | 1+2   |
+| EDIT   | `src/Yolo.cpp`              | 1     |
+| EDIT   | `src/YoloTask.cpp`          | 1     |
+| EDIT   | `src/YoloConfig.cpp`        | 2     |
+| EDIT   | `CMakeLists.txt`            | 1+2   |
+| EDIT   | `samples/CMakeLists.txt`    | 1     |
+| EDIT   | `samples/common.hpp`        | 2     |
+| EDIT   | `samples/det.cpp`           | 2     |
+| EDIT   | `samples/cls.cpp`           | 2     |
+| EDIT   | `tools/bench.cpp`           | 2     |
+| CREATE | `tools/app_common.hpp`      | 2     |
 
 **Do not touch any other file.**

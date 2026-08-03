@@ -9,30 +9,39 @@
 </p>
 
 # one-yolo
-一个统一的 C++ YOLO 工具箱，支持 `v5 / v8 / v11 / v26 / ...`，覆盖 `分类 / 检测 / 分割 / 姿态 / OBB（旋转框）` 等任务，提供类似 ultralytics/ultralytics 的 Python 风格易用 API。支持 全部 YOLO 任务、全部 YOLO 版本、全部 YOLO 推理后端 —— 是时候真正做到 All-in-One。
+
+一个统一的 C++ YOLO 工具箱，支持 `v5 / v8 / v11 / v26 / ...`，覆盖 `分类 / 检测 / 分割 / 姿态 / OBB（旋转框）` 等任务，提供类似
+ultralytics/ultralytics 的 Python 风格易用 API。支持 全部 YOLO 任务、全部 YOLO 版本、全部 YOLO 推理后端 —— 是时候真正做到
+All-in-One。
 <p style="" align="center">
   <img src="./docs/showcase.gif" alt="Logo" width="85%">
 </p>
 
 ## ✨ 亮点
+
 1. 支持全部 YOLO 任务：`classification（分类）` / `detection（检测）` / `segmentation（分割）` / `pose（姿态）` / `obb（旋转框）`
-2. 支持全部 YOLO 版本：`yolov5（anchor-based）` / `yolov5u（anchor-free）` / `yolov8` / `yolov11` / `yolov26（nms-free）` / `以及未来版本`。同时支持 `n / s / m / l / x` 等子版本
-3. 支持全部 YOLO 推理后端（runtime）：`OpenCV::DNN` / `ONNXRuntime` / `TensorRT` / `OpenVINO` / `RKNN` / `CoreML` / `CANN` / `PaddlePaddle` ...
+2. 支持全部 YOLO 版本：`yolov5（anchor-based）` / `yolov5u（anchor-free）` / `yolov8` / `yolov11` / `yolov26（nms-free）` /
+   `以及未来版本`。同时支持 `n / s / m / l / x` 等子版本
+3. 支持全部 YOLO 推理后端（runtime）：`OpenCV::DNN` / `ONNXRuntime` / `TensorRT` / `OpenVINO` / `RKNN` / `CoreML` /
+   `CANN` / `PaddlePaddle` ...
 4. API 简洁易用，调用方式类似 `ultralytics/ultralytics` python库
 5. 开箱即用：提供模型，设置配置参数，即可开始预测
 
 ## 🚀 快速开始
 
 ### 基础依赖
+
 1. C++ >= 17
 2. GCC >= 7.5
 3. OpenCV == 4.13
 4. CUDA/ONNXRuntime/TensorRT/OpenVINO/RKNN/... are optional
 
 ### 编译源码
+
 1. run `git clone https://github.com/sherlockchou86/one-yolo.git`
 2. run `cd one-yolo && mkdir build && cd build`
-3. run `cmake .. && make -j8` or click `debug` button to run samples directly if you have opened the project using VS Code
+3. run `cmake .. && make -j8` or click `debug` button to run samples directly if you have opened the project using VS
+   Code
 
 > you must put test data(models&video&images) at the same directory as one-yolo first before runing the samples.
 
@@ -57,6 +66,7 @@ CUDA 在自行编译 OpenCV 时为可选项。
 ### one-yolo示例
 
 使用 yolov8s 进行车辆检测与跟踪：
+
 ```c++
 #include "Yolo.h"
 #include "track/YoloTracker.h"
@@ -109,7 +119,7 @@ int main() {
         // 打印输出结果
         results[0].info();
         results[0].to_json(true);
-        results[0].to_csv(true);
+        results[0].toCsv(true);
 
         // 显示结果
         if (results[0].show(
@@ -130,13 +140,17 @@ int main() {
     }
 }
 ```
+
 ### 示例效果
+
 使用 yolov8s 进行车辆检测与跟踪的视频效果：
 
 https://github.com/user-attachments/assets/d8b0b711-8922-41f8-8ec7-d1cea1f48afc
 
 ### 示例输出
+
 json/csv output result of vechile detection & tracking using yolov8s:
+
 ```
 json output:
 [
@@ -263,6 +277,7 @@ id,cls_id,conf,label,track_id
 ```
 
 ## 🆒 架构图
+
 ![](./docs/architecture.png)
 
 ## 📚 参考资料

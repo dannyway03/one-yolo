@@ -15,16 +15,17 @@
 #include <cmath>
 #include <cstddef>
 
+#include <iostream>
+
 namespace yolo {
 
 HungarianAlgorithm::HungarianAlgorithm() = default;
-HungarianAlgorithm::~HungarianAlgorithm() = default;
 
 //********************************************************//
 // A single function wrapper for solving assignment problem.
 //********************************************************//
 auto
-HungarianAlgorithm::Solve(vector<vector<double>>& dist_matrix, vector<int>& assignment) -> double
+HungarianAlgorithm::solve(vector<vector<double>>& dist_matrix, vector<int>& assignment) -> double
 {
   unsigned int n_rows = dist_matrix.size();
   unsigned int n_cols = dist_matrix[0].size();
@@ -72,23 +73,23 @@ HungarianAlgorithm::assignmentoptimal(int* assignment, double* cost, double* dis
   /* generate working copy of distance Matrix */
   /* check if all matrix elements are positive */
   n_of_elements = n_of_rows * n_of_columns;
-  dist_matrix = (double*)malloc(n_of_elements * sizeof(double));
+  dist_matrix = static_cast<double*>(malloc(n_of_elements * sizeof(double)));
   dist_matrix_end = dist_matrix + n_of_elements;
 
   for (row = 0; row < n_of_elements; row++)
   {
     value = dist_matrix_in[row];
     if (value < 0)
-      cerr << "All matrix elements have to be non-negative." << '\n';
+      std::cerr << "All matrix elements have to be non-negative." << '\n';
     dist_matrix[row] = value;
   }
 
   /* memory allocation */
-  covered_columns = (bool*)calloc(n_of_columns, sizeof(bool));
-  covered_rows = (bool*)calloc(n_of_rows, sizeof(bool));
-  star_matrix = (bool*)calloc(n_of_elements, sizeof(bool));
-  prime_matrix = (bool*)calloc(n_of_elements, sizeof(bool));
-  new_star_matrix = (bool*)calloc(n_of_elements, sizeof(bool)); /* used in step4 */
+  covered_columns = static_cast<bool*>(calloc(n_of_columns, sizeof(bool)));
+  covered_rows = static_cast<bool*>(calloc(n_of_rows, sizeof(bool)));
+  star_matrix = static_cast<bool*>(calloc(n_of_elements, sizeof(bool)));
+  prime_matrix = static_cast<bool*>(calloc(n_of_elements, sizeof(bool)));
+  new_star_matrix = static_cast<bool*>(calloc(n_of_elements, sizeof(bool))); /* used in step4 */
 
   /* preliminary steps */
   if (n_of_rows <= n_of_columns)

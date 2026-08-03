@@ -9,154 +9,144 @@ namespace yolo {
 auto
 YoloResult::plot(const DrawParam& param) const -> cv::Mat
 {
-  switch (task)
+  switch (task_)
   {
     case YoloTaskType::CLS:
     {
-      return draw_results(orig_image, param, top5(), top5_confs(), top5_labels(),
-                          {}, {}, {}, {}, {}, {});
+      return drawResults(orig_image_, param, top5(), top5Confs(), top5Labels(), {}, {}, {}, {}, {}, {});
     }
     case YoloTaskType::DET:
     {
-      return draw_results(orig_image, param, {}, {}, {},
-                          cls_ids(), confs(), labels(), boxes(), track_ids(), track_points());
+      return drawResults(orig_image_, param, {}, {}, {}, clsIds(), confs(), labels(), boxes(), trackIds(),
+                         trackPoints());
     }
     default:
       throw std::runtime_error("invalid task type in YoloResult!");
-      break;
   }
 }
 
-std::string
-YoloResult::save(const DrawParam& param)
-{
-  auto plot_img = plot(param);
-  // save
-}
-
-int
-YoloResult::show(bool block, float scale_f, const DrawParam& param, bool show_orig_img, bool show_input_img)
+auto
+YoloResult::show(bool block, float scale_f, const DrawParam& param, bool show_orig_img, bool show_input_img) const
+  -> int
 {
   auto plot_img = plot(param);
   scale_f = std::max(0.0f, std::min(1.0f, scale_f));
   if (std::abs(scale_f - 1.0f) > FLT_EPSILON)
     cv::resize(plot_img, plot_img, cv::Size(), scale_f, scale_f);
 
-  cv::imshow("plot-img-" + std::to_string(id) + "(" + std::to_string(plot_img.cols) + "*" +
+  cv::imshow("plot-img-" + std::to_string(id_) + "(" + std::to_string(plot_img.cols) + "*" +
                std::to_string(plot_img.rows) + ")",
              plot_img);
   if (show_orig_img)
   {
-    cv::imshow("orig-img-" + std::to_string(id) + "(" + std::to_string(orig_image.cols) + "*" +
-                 std::to_string(orig_image.rows) + ")",
-               orig_image);
+    cv::imshow("orig-img-" + std::to_string(id_) + "(" + std::to_string(orig_image_.cols) + "*" +
+                 std::to_string(orig_image_.rows) + ")",
+               orig_image_);
   }
   if (show_input_img)
   {
-    cv::imshow("input-img-" + std::to_string(id) + "(" + std::to_string(input_image.cols) + "*" +
-                 std::to_string(input_image.rows) + ")",
-               input_image);
+    cv::imshow("input-img-" + std::to_string(id_) + "(" + std::to_string(input_image_.cols) + "*" +
+                 std::to_string(input_image_.rows) + ")",
+               input_image_);
   }
 
   auto delay = block ? 0 : 1;
   return cv::waitKey(delay);
 }
 
-std::string
-YoloResult::to_csv(bool print)
+auto
+YoloResult::toCsv(bool print) -> std::string
 {
   std::ostringstream oss;
-  switch (task)
+  switch (task_)
   {
     case YoloTaskType::CLS:
     {
-      oss << "rank,cls_id,conf,label" << std::endl;
-      for (size_t i = 0; i < classes.size(); i++)
+      oss << "rank,cls_id_,conf,label\n";
+      for (size_t i = 0; i < classes_.size(); i++)
       {
-        auto& obj = classes[i];
-        oss << (i + 1) << "," << obj.cls_id << "," << obj.conf << "," << obj.label;
-        if (i + 1 != classes.size())
-          oss << std::endl;
+        auto& obj = classes_[i];
+        oss << (i + 1) << "," << obj.cls_id_ << "," << obj.conf_ << "," << obj.label_;
+        if (i + 1 != classes_.size())
+          oss << "\n";
       }
       break;
     }
     case YoloTaskType::DET:
     {
-      oss << "id,cls_id,conf,label,track_id" << std::endl;
-      for (size_t i = 0; i < detections.size(); i++)
+      oss << "id,cls_id_,conf,label,track_id\n";
+      for (size_t i = 0; i < detections_.size(); i++)
       {
-        auto& obj = detections[i];
-        oss << (i + 1) << "," << obj.cls_id << "," << obj.conf << "," << obj.label << "," << obj.track_id;
-        if (i + 1 != detections.size())
-          oss << std::endl;
+        auto& obj = detections_[i];
+        oss << (i + 1) << "," << obj.cls_id_ << "," << obj.conf_ << "," << obj.label_ << "," << obj.track_id_;
+        if (i + 1 != detections_.size())
+          oss << "\n";
       }
       break;
     }
     default:
       throw std::runtime_error("invalid task type in YoloResult!");
-      break;
   }
   auto c_str = oss.str();
   if (print)
-    std::cout << c_str << std::endl;
+    std::cout << c_str << "\n";
 
   return c_str;
 }
 
 std::string
-YoloResult::to_json(bool print, bool indent)
+YoloResult::toJson(bool print, bool indent) // NOLINT
 {
-  std::string j_str = "";
+  std::string j_str;
   auto indent_num = indent ? 4 : -1;
-  switch (task)
+  switch (task_)
   {
     case YoloTaskType::CLS:
     {
-      json j = classes;
+      json j = classes_;
       j_str = j.dump(indent_num);
       break;
     }
     case YoloTaskType::DET:
     {
-      json j = detections;
+      json j = detections_;
       j_str = j.dump(indent_num);
       break;
     }
     default:
       throw std::runtime_error("invalid task type in YoloResult!");
-      break;
   }
   if (print)
-    std::cout << j_str << std::endl;
+    std::cout << j_str << "\n";
 
   return j_str;
 }
 
-std::string
-YoloResult::info(bool print)
+auto
+YoloResult::info(bool print) -> std::string
 {
   std::ostringstream oss;
-  oss << "########### YoloResult ###########" << std::endl;
-  oss << "id                : " << id << std::endl;
-  oss << "task              : " << toString(task) << std::endl;
-  oss << "yolo version      : " << toString(version) << std::endl;
-  oss << "yolo runtime      : " << toString(target_rt) << std::endl;
-  oss << "batch size        : " << batch_size << std::endl;
-  oss << "input width       : " << input_w << std::endl;
-  oss << "input height      : " << input_h << std::endl;
-  oss << "original size     : " << orig_size.width << " * " << orig_size.height << std::endl;
-  oss << "letterbox         : " << "scale: " << letterbox_info.scale << ", pad_w: " << letterbox_info.pad_w
-      << ", pad_h: " << letterbox_info.pad_h << std::endl;
-  oss << "speed             : " << "pre: " << speed[0] << "ms, infer: " << speed[1] << "ms, post: " << speed[2] << "ms"
-      << std::endl;
-  auto n = std::min(names.size(), static_cast<size_t>(5));
-  auto top5_names = std::vector<std::string>(names.begin(), names.begin() + n);
-  oss << "names(top5)       : " << top5_names << std::endl;
-  if (task == YoloTaskType::CLS)
+  oss << "########### YoloResult ###########\n";
+  oss << "id                : " << id_ << "\n";
+  oss << "task              : " << toString(task_) << "\n";
+  oss << "yolo version      : " << toString(version_) << "\n";
+  oss << "yolo runtime      : " << toString(target_rt_) << "\n";
+  oss << "batch size        : " << batch_size_ << "\n";
+  oss << "input width       : " << input_w_ << "\n";
+  oss << "input height      : " << input_h_ << "\n";
+  oss << "original size     : " << orig_size_.width << " * " << orig_size_.height << "\n";
+  oss << "letterbox         : " << "scale: " << letterbox_info_.scale_ << ", pad_w: " << letterbox_info_.pad_w_
+      << ", pad_h: " << letterbox_info_.pad_h_ << "\n";
+  oss << "speed             : " << "pre: " << speed_[0] << "ms, infer: " << speed_[1] << "ms, post: " << speed_[2]
+      << "ms"
+      << "\n";
+  auto n = std::min(names_.size(), static_cast<size_t>(5));
+  auto top5_names = std::vector<std::string>(names_.begin(), names_.begin() + n);
+  oss << "names(top5)       : " << top5_names << "\n";
+  if (task_ == YoloTaskType::CLS)
   {
-    // labels&confs of top5: label0(conf0), label1(conf1), ...
-    auto t5_labels = top5_labels();
-    auto t5_confs = top5_confs();
+    auto t5_labels = top5Labels();
+    auto t5_confs = top5Confs();
     auto t5_out = t5_labels[0] + "(" + std::to_string(t5_confs[0]) + ")";
     for (size_t i = 1; i < t5_labels.size(); i++)
       t5_out += ", " + t5_labels[i] + "(" + std::to_string(t5_confs[i]) + ")";
@@ -164,175 +154,172 @@ YoloResult::info(bool print)
   }
   else
   {
-    // number of boxes, which stand for the number of predicted objects.
     oss << "objects count     : " << boxes().size();
   }
 
   auto summary = oss.str();
   if (print)
-    std::cout << summary << std::endl;
+    std::cout << summary << "\n";
   return summary;
 }
 
-int
-YoloResult::top1() const
+auto
+YoloResult::top1() const -> int
 {
-  if (task != YoloTaskType::CLS || classes.empty())
+  if (task_ != YoloTaskType::CLS || classes_.empty())
   {
     throw std::runtime_error("could not get top1 from YoloResult, "
                              "it's not a classification task.");
   }
-  return classes[0].cls_id;
+  return classes_[0].cls_id_;
 }
 
-float
-YoloResult::top1_conf() const
+auto
+YoloResult::top1Conf() const -> float
 {
-  if (task != YoloTaskType::CLS || classes.empty())
+  if (task_ != YoloTaskType::CLS || classes_.empty())
   {
     throw std::runtime_error("could not get top1 conf from YoloResult, "
                              "it's not a classification task.");
   }
-  return classes[0].conf;
+  return classes_[0].conf_;
 }
 
-std::string
-YoloResult::top1_label() const
+auto
+YoloResult::top1Label() const -> std::string
 {
-  if (task != YoloTaskType::CLS || classes.empty())
+  if (task_ != YoloTaskType::CLS || classes_.empty())
   {
     throw std::runtime_error("could not get top1 label from YoloResult, "
                              "it's not a classification task.");
   }
-  return classes[0].label;
+  return classes_[0].label_;
 }
 
-std::vector<int>
-YoloResult::top5() const
+auto
+YoloResult::top5() const -> std::vector<int>
 {
-  if (task != YoloTaskType::CLS || classes.empty())
+  if (task_ != YoloTaskType::CLS || classes_.empty())
   {
     throw std::runtime_error("could not get top5 from YoloResult, "
                              "it's not a classification task.");
   }
-  // return the right number if size < 5
-  auto n = std::min(classes.size(), static_cast<size_t>(5));
+  auto n = std::min(classes_.size(), static_cast<size_t>(5));
   std::vector<int> cls_ids;
+  cls_ids.reserve(n);
   for (size_t i = 0; i < n; ++i)
-    cls_ids.push_back(classes[i].cls_id);
+    cls_ids.push_back(classes_[i].cls_id_);
   return cls_ids;
 }
 
-std::vector<float>
-YoloResult::top5_confs() const
+auto
+YoloResult::top5Confs() const -> std::vector<float>
 {
-  if (task != YoloTaskType::CLS || classes.empty())
+  if (task_ != YoloTaskType::CLS || classes_.empty())
   {
     throw std::runtime_error("could not get top5 confs from YoloResult, "
                              "it's not a classification task.");
   }
-  // return the right number if size < 5
-  auto n = std::min(classes.size(), static_cast<size_t>(5));
+  auto n = std::min(classes_.size(), static_cast<size_t>(5));
   std::vector<float> confs;
+  confs.reserve(n);
   for (size_t i = 0; i < n; ++i)
-    confs.push_back(classes[i].conf);
+    confs.push_back(classes_[i].conf_);
   return confs;
 }
 
-std::vector<std::string>
-YoloResult::top5_labels() const
+auto
+YoloResult::top5Labels() const -> std::vector<std::string>
 {
-  if (task != YoloTaskType::CLS || classes.empty())
+  if (task_ != YoloTaskType::CLS || classes_.empty())
   {
     throw std::runtime_error("could not get top5 labels from YoloResult, "
                              "it's not a classification task.");
   }
-  // return the right number if size < 5
-  auto n = std::min(classes.size(), static_cast<size_t>(5));
+  auto n = std::min(classes_.size(), static_cast<size_t>(5));
   std::vector<std::string> labels;
+  labels.reserve(n);
   for (size_t i = 0; i < n; ++i)
-    labels.push_back(classes[i].label);
+    labels.push_back(classes_[i].label_);
   return labels;
 }
 
-std::vector<cv::Rect>
-YoloResult::boxes() const
+auto
+YoloResult::boxes() const -> std::vector<cv::Rect>
 {
-  if (task != YoloTaskType::DET)
+  if (task_ != YoloTaskType::DET)
   {
     throw std::runtime_error("could not get boxes from YoloResult, "
                              "it's not a detection|segmentation|pose task.");
   }
   std::vector<cv::Rect> boxes;
 
-  // priority:
-  // detection->segmentation->pose
-  if (!detections.empty())
+  if (!detections_.empty())
   {
-    boxes.reserve(detections.size());
-    for (size_t i = 0; i < detections.size(); ++i)
-      boxes.emplace_back(detections[i].box);
+    boxes.reserve(detections_.size());
+    for (const auto& detection : detections_)
+      boxes.emplace_back(detection.box_);
   }
   return boxes;
 }
 
-std::vector<int>
-YoloResult::cls_ids() const
+auto
+YoloResult::clsIds() const -> std::vector<int>
 {
-  if (task != YoloTaskType::DET)
+  if (task_ != YoloTaskType::DET)
     throw std::runtime_error("could not get cls_ids from YoloResult: not a detection task.");
   std::vector<int> cls_ids;
-  cls_ids.reserve(detections.size());
-  for (const auto& d : detections)
-    cls_ids.emplace_back(d.cls_id);
+  cls_ids.reserve(detections_.size());
+  for (const auto& d : detections_)
+    cls_ids.emplace_back(d.cls_id_);
   return cls_ids;
 }
 
-std::vector<float>
-YoloResult::confs() const
+auto
+YoloResult::confs() const -> std::vector<float>
 {
-  if (task != YoloTaskType::DET)
+  if (task_ != YoloTaskType::DET)
     throw std::runtime_error("could not get confs from YoloResult: not a detection task.");
   std::vector<float> confs;
-  confs.reserve(detections.size());
-  for (const auto& d : detections)
-    confs.emplace_back(d.conf);
+  confs.reserve(detections_.size());
+  for (const auto& d : detections_)
+    confs.emplace_back(d.conf_);
   return confs;
 }
 
-std::vector<std::string>
-YoloResult::labels() const
+auto
+YoloResult::labels() const -> std::vector<std::string>
 {
-  if (task != YoloTaskType::DET)
+  if (task_ != YoloTaskType::DET)
     throw std::runtime_error("could not get labels from YoloResult: not a detection task.");
   std::vector<std::string> labels;
-  labels.reserve(detections.size());
-  for (const auto& d : detections)
-    labels.emplace_back(d.label);
+  labels.reserve(detections_.size());
+  for (const auto& d : detections_)
+    labels.emplace_back(d.label_);
   return labels;
 }
 
-std::vector<int>
-YoloResult::track_ids() const
+auto
+YoloResult::trackIds() const -> std::vector<int>
 {
-  if (task != YoloTaskType::DET)
+  if (task_ != YoloTaskType::DET)
     throw std::runtime_error("could not get track ids from YoloResult: not a detection task.");
   std::vector<int> track_ids;
-  track_ids.reserve(detections.size());
-  for (const auto& d : detections)
-    track_ids.emplace_back(d.track_id);
+  track_ids.reserve(detections_.size());
+  for (const auto& d : detections_)
+    track_ids.emplace_back(d.track_id_);
   return track_ids;
 }
 
-std::vector<std::vector<cv::Point>>
-YoloResult::track_points() const
+auto
+YoloResult::trackPoints() const -> std::vector<std::vector<cv::Point>>
 {
-  if (task != YoloTaskType::DET)
+  if (task_ != YoloTaskType::DET)
     throw std::runtime_error("could not get track points from YoloResult: not a detection task.");
   std::vector<std::vector<cv::Point>> track_points;
-  track_points.reserve(detections.size());
-  for (const auto& d : detections)
-    track_points.emplace_back(d.track_points);
+  track_points.reserve(detections_.size());
+  for (const auto& d : detections_)
+    track_points.emplace_back(d.track_points_);
   return track_points;
 }
 

@@ -14,8 +14,7 @@ YoloTracker::~YoloTracker() = default;
 void
 YoloTracker::init()
 {
-  // choose track algorithm
-  switch (cfg_.algo)
+  switch (cfg_.algo_)
   {
     case YoloTrackAlgo::SORT:
     {
@@ -24,7 +23,7 @@ YoloTracker::init()
     }
     case YoloTrackAlgo::BYTE_TRACK:
     {
-      throw std::invalid_argument("invalid YoloTrackAlgo parameter when initializing YoloTracker!");
+      throw std::invalid_argument("ByteTrack is not implemented — models are present but the algorithm is not wired up.");
       break;
     }
     default:
@@ -49,10 +48,6 @@ YoloTracker::preprocess(const YoloResult& res, std::vector<cv::Rect>& boxes,
 {
   auto res_boxes = res.boxes();
   boxes.insert(boxes.end(), res_boxes.begin(), res_boxes.end());
-
-  /* embeddings reserved because no embeddings in YoloResult now */
-  // auto res_embeddings = res.embeddings();
-  // embeddings.insert(embeddings.end(), res_embeddings.begin(), res_embeddings.end());
 }
 
 void
@@ -67,7 +62,6 @@ YoloTracker::postprocess(const std::vector<cv::Rect>& boxes, const std::vector<s
                          const std::vector<int>& track_ids, YoloResult& res)
 {
   assert(boxes.size() == track_ids.size());
-  // assert(embeddings.size() == track_ids.size());
 
   for (size_t i = 0; i < track_ids.size(); i++)
   {
@@ -79,7 +73,7 @@ YoloTracker::postprocess(const std::vector<cv::Rect>& boxes, const std::vector<s
 
     cv::Point track_point;
 
-    switch (cfg_.loc)
+    switch (cfg_.loc_)
     {
       case YoloTrackLoc::CENTER:
       {
@@ -95,7 +89,7 @@ YoloTracker::postprocess(const std::vector<cv::Rect>& boxes, const std::vector<s
       }
       case YoloTrackLoc::BOTTOM_CUSTOM:
       {
-        track_point.x = box.x + int(box.width * cfg_.loc_f);
+        track_point.x = box.x + static_cast<int>(box.width * cfg_.loc_f_);
         track_point.y = box.y + box.height;
         break;
       }
@@ -105,18 +99,17 @@ YoloTracker::postprocess(const std::vector<cv::Rect>& boxes, const std::vector<s
     }
 
     tracking_points_[track_id].emplace_back(track_point);
-    // reset to 0 since it got hit
     tracking_miss_times_[track_id] = 0;
 
     /* update track id & track points for YoloResult via indice directly
        important: they have the same indice order
     */
-    switch (res.task)
+    switch (res.task_)
     {
       case YoloTaskType::DET:
       {
-        res.detections[i].track_id = track_id;
-        res.detections[i].track_points = tracking_points_[track_id];
+        res.detections_[i].track_id_ = track_id;
+        res.detections_[i].track_points_ = tracking_points_[track_id];
         break;
       }
       default:
@@ -132,7 +125,7 @@ YoloTracker::postprocess(const std::vector<cv::Rect>& boxes, const std::vector<s
     if (i->second)
       i->second++;
 
-    if (i->second > cfg_.max_miss)
+    if (i->second > cfg_.max_miss_)
     {
       tracking_points_.erase(i->first);
       i = tracking_miss_times_.erase(i);
@@ -149,7 +142,7 @@ YoloTracker::postprocess(const std::vector<cv::Rect>& boxes, const std::vector<s
 void
 YoloTracker::track(YoloResult& res)
 {
-  if (res.task != YoloTaskType::DET)
+  if (res.task_ != YoloTaskType::DET)
   {
     throw std::runtime_error("got unsupported task type when calling YoloTracker::track()!");
     return;

@@ -58,8 +58,8 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
   auto& r = results[0];
 
   r.info();
-  r.to_json(true);
-  r.to_csv(true);
+  r.toJson(true);
+  r.toCsv(true);
 
   auto annotated = r.plot();
   const std::string out_path = "/tmp/yolox_result_" + backend + ".jpg";

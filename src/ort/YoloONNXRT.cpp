@@ -61,8 +61,8 @@ YoloONNXRT::ortForward(const cv::Mat& input_4d, std::vector<cv::Mat>& outputs)
   auto input_tensor_size = input_4d.total();
 
   // cv::Mat → ORT Tensor (zero copy)
-  Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info_, (float*)input_4d.data, input_tensor_size,
-                                                            input_shape.data(), input_shape.size());
+  Ort::Value input_tensor = Ort::Value::CreateTensor<float>(memory_info_, reinterpret_cast<float*>(input_4d.data),
+                                                            input_tensor_size, input_shape.data(), input_shape.size());
 
   auto output_tensors = session_.Run(Ort::RunOptions{nullptr}, input_names_.data(), &input_tensor, input_names_.size(),
                                      output_names_.data(), output_names_.size());

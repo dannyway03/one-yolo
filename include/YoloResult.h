@@ -28,23 +28,23 @@ namespace yolo {
 struct YoloResult
 {
   /* structured results */
-  std::vector<YoloClsObj> classes;    // YoloClsObj list for classification task
-  std::vector<YoloDetObj> detections; // YoloDetObj list for detection task
+  std::vector<YoloClsObj> classes_;    // YoloClsObj list for classification task
+  std::vector<YoloDetObj> detections_; // YoloDetObj list for detection task
 
   /* debug information */
-  int id = -1; // -1 means not initialized by Yolo. set as batch index if Yolo works with batch mode, or 0 forever.
-  YoloTaskType task;
-  YoloVersion version;
-  YoloTargetRT target_rt;
-  int batch_size;
-  int input_w;
-  int input_h;
-  cv::Mat input_image;
-  LetterBoxInfo letterbox_info;
-  cv::Mat orig_image;
-  cv::Size orig_size;
-  std::vector<std::string> names;
-  std::vector<float> speed; // time for preprocess, inference, postprocess
+  int id_ = -1; // -1 means not initialized by Yolo. set as batch index if Yolo works with batch mode, or 0 forever.
+  YoloTaskType task_;
+  YoloVersion version_;
+  YoloTargetRT target_rt_;
+  int batch_size_{};
+  int input_w_{};
+  int input_h_{};
+  cv::Mat input_image_;
+  LetterBoxInfo letterbox_info_{};
+  cv::Mat orig_image_;
+  cv::Size orig_size_;
+  std::vector<std::string> names_;
+  std::vector<float> speed_; // time for preprocess, inference, postprocess
 
   /* tookit */
   /* ****** */
@@ -54,7 +54,7 @@ struct YoloResult
    *
    * @param param parameter for drawing.
    */
-  auto
+  [[nodiscard]] auto
   plot(const DrawParam& param = DrawParam()) const -> cv::Mat;
 
   /**
@@ -75,18 +75,9 @@ struct YoloResult
    * use un-block mode if show multi annotated images from video sequences in a loop,
    * check the return value to determine if it's time to break the loop.
    */
-  int
+  [[nodiscard]] auto
   show(bool block = true, float scale_f = 1.0f, const DrawParam& param = DrawParam(), bool show_orig_img = false,
-       bool show_input_img = false);
-
-  /**
-   * @brief
-   * save annotated image to file and return filename.
-   *
-   * @return filename of annotated image.
-   */
-  std::string
-  save(const DrawParam& param = DrawParam());
+       bool show_input_img = false) const -> int;
 
   /**
    * @brief
@@ -97,8 +88,8 @@ struct YoloResult
    *
    * @return string of json.
    */
-  std::string
-  to_json(bool print = false, bool indent = true);
+  auto
+  toJson(bool print = false, bool indent = true) -> std::string;
 
   /**
    * @brief
@@ -108,8 +99,8 @@ struct YoloResult
    *
    * @return string of csv.
    */
-  std::string
-  to_csv(bool print = false);
+  auto
+  toCsv(bool print = false) -> std::string;
 
   /**
    * @brief
@@ -119,8 +110,8 @@ struct YoloResult
    *
    * @return summary for `YoloResult`.
    */
-  std::string
-  info(bool print = true);
+  auto
+  info(bool print = true) -> std::string;
 
   /* easy api for classification task. */
   /************************************/
@@ -134,8 +125,8 @@ struct YoloResult
    * @note
    * throw error if it's not a classification task.
    */
-  int
-  top1() const;
+  [[nodiscard]] auto
+  top1() const -> int;
 
   /**
    * @brief
@@ -147,8 +138,8 @@ struct YoloResult
    * @note
    * throw error if it's not a classification task.
    */
-  float
-  top1_conf() const;
+  [[nodiscard]] auto
+  top1Conf() const -> float;
 
   /**
    * @brief
@@ -160,8 +151,8 @@ struct YoloResult
    * @note
    * throw error if it's not a classification task.
    */
-  std::string
-  top1_label() const;
+  [[nodiscard]] auto
+  top1Label() const -> std::string;
 
   /**
    * @brief
@@ -173,8 +164,8 @@ struct YoloResult
    * @note
    * throw error if it's not a classification task.
    */
-  std::vector<int>
-  top5() const;
+  [[nodiscard]] auto
+  top5() const -> std::vector<int>;
 
   /**
    * @brief
@@ -186,8 +177,8 @@ struct YoloResult
    * @note
    * throw error if it's not a classification task.
    */
-  std::vector<float>
-  top5_confs() const;
+  [[nodiscard]] auto
+  top5Confs() const -> std::vector<float>;
 
   /**
    * @brief
@@ -199,17 +190,23 @@ struct YoloResult
    * @note
    * throw error if it's not a classification task.
    */
-  std::vector<std::string>
-  top5_labels() const;
+  [[nodiscard]] auto
+  top5Labels() const -> std::vector<std::string>;
 
   /* easy api for detection task. */
   /********************************/
-  std::vector<cv::Rect>       boxes() const;
-  std::vector<int>            cls_ids() const;
-  std::vector<float>          confs() const;
-  std::vector<std::string>    labels() const;
-  std::vector<int>            track_ids() const;
-  std::vector<std::vector<cv::Point>> track_points() const;
+  [[nodiscard]] auto
+  boxes() const -> std::vector<cv::Rect>;
+  [[nodiscard]] auto
+  clsIds() const -> std::vector<int>;
+  [[nodiscard]] auto
+  confs() const -> std::vector<float>;
+  [[nodiscard]] auto
+  labels() const -> std::vector<std::string>;
+  [[nodiscard]] auto
+  trackIds() const -> std::vector<int>;
+  [[nodiscard]] auto
+  trackPoints() const -> std::vector<std::vector<cv::Point>>;
 };
 
 } // namespace yolo

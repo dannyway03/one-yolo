@@ -30,7 +30,7 @@ ImplementationFileExtensions:
   - cc
   - cpp
   - cxx
-HeaderFilterRegex: '^(src|demo|apps|test|include)/'
+HeaderFilterRegex: '.*(src|include|samples|tools)/.*'
 FormatStyle: file
 UseColor: true
 CheckOptions:

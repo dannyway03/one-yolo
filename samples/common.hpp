@@ -4,8 +4,6 @@
 
 #include <algorithm>
 #include <iostream>
-#include <optional>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -51,14 +49,13 @@ isImageSource(std::string_view path) -> bool
 isCameraIndex(std::string_view s) -> bool
 {
   return !s.empty() && std::all_of(s.begin(), s.end(),
-                                   [](char c)
+                                   [](char c) -> bool
                                    {
                                      return std::isdigit(c) != 0;
                                    });
 }
 
 // ── config builders ───────────────────────────────────────────────────────────
-
 
 [[nodiscard]] inline auto
 buildYoloConfig(const CliArgs& a, yolo::YoloTaskType /*task*/) -> yolo::YoloConfig
@@ -72,8 +69,8 @@ buildYoloConfig(const CliArgs& a, yolo::YoloTaskType /*task*/) -> yolo::YoloConf
 buildTrackerConfig() -> yolo::YoloTrackConfig
 {
   yolo::YoloTrackConfig t;
-  t.algo = yolo::YoloTrackAlgo::SORT;
-  t.iou_thresh = 0.6f;
+  t.algo_ = yolo::YoloTrackAlgo::SORT;
+  t.iou_thresh_ = 0.6f;
   return t;
 }
 

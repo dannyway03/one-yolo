@@ -1057,7 +1057,7 @@ struct YoloConfig
   int batch_size_ = 1;         // batch size for Yolo model, 0 means dynamic batch size
   int input_w_ = 640;          // input width for Yolo model
   int input_h_ = 640;          // input height for Yolo model
-  int num_classes_ = 80;       // number of classes for Yolo model
+  int num_classes_ = 80;       // number of classes_ for Yolo model
   int num_kpts_ = 17;          // number of keypoints for Yolo model (pose task), 17 by default
   int num_channels_ = 32;      // number of mask channels for Yolo model (segmentation task), 32 by default
   float conf_thresh_ = 0.25f;  // confidence threshold of postprocess for Yolo model, 0.25f by default

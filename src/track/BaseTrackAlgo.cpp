@@ -7,6 +7,4 @@ BaseTrackAlgo::BaseTrackAlgo(const YoloTrackConfig& cfg)
   _cfg = cfg;
 }
 
-BaseTrackAlgo::~BaseTrackAlgo() = default;
-
 } // namespace yolo

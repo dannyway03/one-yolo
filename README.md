@@ -9,21 +9,28 @@
 </p>
 
 # one-yolo
-A unified C++ toolkit for YOLO `v5/v8/v11/v26/...`, covering `classification/detection/segmentation/pose/obb` tasks with easy python-like APIs from `ultralytics/ultralytics`. Support `All Yolo Tasks, All Yolo Versions, All Yolo Runtimes`, it's time to make all in one.
+
+A unified C++ toolkit for YOLO `v5/v8/v11/v26/...`, covering `classification/detection/segmentation/pose/obb` tasks with
+easy python-like APIs from `ultralytics/ultralytics`. Support `All Yolo Tasks, All Yolo Versions, All Yolo Runtimes`,
+it's time to make all in one.
 <p style="" align="center">
   <img src="./docs/showcase.gif" alt="Logo" width="85%">
 </p>
 
 ## ✨ highlight
+
 1. support all `Yolo` tasks including `classification`/`detection`/`segmentation`/`pose`/`obb`.
-2. support all `Yolo` versions including `yolov5(anchor-based)`/`yolov5u(anchor-free)`/`yolov8`/`yolov11`/`yolov26(nms-free)`/`more in the future`, sub versions like `n/s/m/l/x` are also supported.
-3. support all `Yolo` inference backends(runtime) such as `OpenCV::DNN`/`ONNXRuntime`/`TensorRT`/`OpenVINO`/`RKNN`/`CoreML`/`CANN`/`PaddlePaddle`...
+2. support all `Yolo` versions including `yolov5(anchor-based)`/`yolov5u(anchor-free)`/`yolov8`/`yolov11`/
+   `yolov26(nms-free)`/`more in the future`, sub versions like `n/s/m/l/x` are also supported.
+3. support all `Yolo` inference backends(runtime) such as `OpenCV::DNN`/`ONNXRuntime`/`TensorRT`/`OpenVINO`/`RKNN`/
+   `CoreML`/`CANN`/`PaddlePaddle`...
 4. easy APIs to use and integrate, as simple as python APIs from `ultralytics/ultralytics` library.
 5. toolkit works out of box, provide the model and set up the config parameters, go predict!
 
 ## 🚀 quick start
 
 ### requirements
+
 1. C++ >= 17, clang++ >= 20 or GCC >= 12
 2. CMake >= 3.21 (for preset support)
 3. OpenCV >= 4.10
@@ -49,15 +56,15 @@ cmake --build --preset Release --target det cls seg pose obb bench
 
 Available `-DBUILD_WITH_*` flags:
 
-| flag | backend |
-|------|---------|
-| `BUILD_WITH_ORT=ON` | ONNXRuntime (CPU / CUDA) |
+| flag                | backend                      |
+|---------------------|------------------------------|
+| `BUILD_WITH_ORT=ON` | ONNXRuntime (CPU / CUDA)     |
 | `BUILD_WITH_OVN=ON` | OpenVINO (CPU / iGPU / AUTO) |
-| `BUILD_WITH_TRT=ON` | TensorRT (NVIDIA GPU) |
-| `BUILD_WITH_RKN=ON` | RKNN (RockChip NPU) |
-| `BUILD_WITH_CML=ON` | CoreML (Apple) |
-| `BUILD_WITH_PDL=ON` | PaddlePaddle |
-| `BUILD_WITH_CAN=ON` | CANN (HuaWei NPU) |
+| `BUILD_WITH_TRT=ON` | TensorRT (NVIDIA GPU)        |
+| `BUILD_WITH_RKN=ON` | RKNN (RockChip NPU)          |
+| `BUILD_WITH_CML=ON` | CoreML (Apple)               |
+| `BUILD_WITH_PDL=ON` | PaddlePaddle                 |
+| `BUILD_WITH_CAN=ON` | CANN (HuaWei NPU)            |
 
 Without any flag, OpenCV::DNN is used as the default backend.
 
@@ -92,6 +99,7 @@ Samples live in `build/<preset>/samples/`. All share the same flags:
 ```
 
 **Detection — YOLOX-Nano on OpenVINO CPU**
+
 ```bash
 ./det --model models/yolox_nano_1x3x384x640_decoded.xml \
       --version yolox --backend ovn --input-w 640 --input-h 384 \
@@ -99,12 +107,14 @@ Samples live in `build/<preset>/samples/`. All share the same flags:
 ```
 
 **Detection — YOLO11n on ONNXRuntime, webcam**
+
 ```bash
 ./det --model models/yolo11n.onnx --version yolo11 --backend ort \
       --source 0 --no-json --no-csv
 ```
 
 **Detection — custom 3-class model**
+
 ```bash
 ./det --model models/fire_smoke_yolo8s.onnx \
       --version yolo8 --backend ovn --device cpu \
@@ -113,6 +123,7 @@ Samples live in `build/<preset>/samples/`. All share the same flags:
 ```
 
 **Classification — YOLO26n-cls on ONNXRuntime**
+
 ```bash
 ./cls --model models/yolo26n-cls.onnx --version yolo26 --backend ort \
       --input-w 224 --input-h 224 --classes 1000 \
@@ -120,6 +131,7 @@ Samples live in `build/<preset>/samples/`. All share the same flags:
 ```
 
 **Segmentation — YOLO8n-seg on OpenVINO AUTO**
+
 ```bash
 ./seg --model models/yolo8n-seg.onnx --version yolo8 \
       --backend ovn --device auto \
@@ -127,6 +139,7 @@ Samples live in `build/<preset>/samples/`. All share the same flags:
 ```
 
 **Pose estimation — YOLO11n-pose on OpenVINO CPU**
+
 ```bash
 ./pose --model models/yolo11n-pose.onnx --version yolo11 --backend ovn \
        --classes 1 --names person \
@@ -134,6 +147,7 @@ Samples live in `build/<preset>/samples/`. All share the same flags:
 ```
 
 **OBB — YOLO8n-obb on ONNXRuntime**
+
 ```bash
 ./obb --model models/yolo8n-obb.onnx --version yolo8 --backend ort \
       --input-w 1024 --input-h 1024 \
@@ -168,6 +182,7 @@ Measures the full pipeline (preprocess + inference + postprocess) with percentil
 ### hello one-yolo
 
 vehicle detection & tracking task using `yolov8s`:
+
 ```c++
 #include "Yolo.h"
 #include "track/YoloTracker.h"
@@ -224,7 +239,7 @@ int main() {
         // show and print
         results[0].info();           // print summary
         results[0].to_json(true);    // convert structured result to json and print
-        results[0].to_csv(true);     // convert structured result to csv and print
+        results[0].toCsv(true);     // convert structured result to csv and print
         if (results[0].show(
             false, 1.0f, DrawParam(), // show annotated image & input image(640*384) & original image with unblock mode
             true, true) == 27) {      // exit loop if user has pressed ESC
@@ -243,13 +258,17 @@ int main() {
     }
 }
 ```
+
 ### demo video
+
 video result of vehicle detection & tracking using yolov8s:
 
 https://github.com/user-attachments/assets/d8b0b711-8922-41f8-8ec7-d1cea1f48afc
 
 ### demo output
+
 json/csv output result of vechile detection & tracking using yolov8s:
+
 ```
 json output:
 [
@@ -377,7 +396,8 @@ id,cls_id,conf,label,track_id
 
 ## 🆒 architecture diagram
 
-See [docs/BENCHMARKS.md — System Architecture & Dataflow](./docs/BENCHMARKS.md#system-architecture--dataflow) for class hierarchy, sequential and pipeline dataflow diagrams (Mermaid, rendered on GitHub).
+See [docs/BENCHMARKS.md — System Architecture & Dataflow](./docs/BENCHMARKS.md#system-architecture--dataflow) for class
+hierarchy, sequential and pipeline dataflow diagrams (Mermaid, rendered on GitHub).
 
 ## 📚 references
 

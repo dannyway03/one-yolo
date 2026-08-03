@@ -56,6 +56,10 @@ images/
 log/
 debug/
 build/
+scripts/model_download_quantize/yolo26n_openvino_model/
+scripts/model_download_quantize/*.pt
+scripts/model_download_quantize/*.jpg
+scripts/model_download_quantize/*.txt
 
 # ignore files
 /test*.cpp
@@ -73,3 +77,16 @@ build/
 /do not remove/bkp.zip
 /results/clang-tidy/clang-tidy.log
 /results/clang-tidy/fixes.yaml
+/media/mot17-02-frcnn/000001.jpg
+/media/image-net-sample.jpg
+/media/test_frame.jpg
+/results/bench_ovn/mot17/bt.jpg
+/results/bench_ovn/mot17/results.csv
+/results/bench_ovn/mot17/y26.jpg
+/results/bench_ovn/mot17/yx.jpg
+/results/clang-tidy.zip
+/results/pipeline_bench_20260802_1314.txt
+/compile_commands.json
+/venv/
+/.idea/editor.xml
+/.idea/ruff.xml

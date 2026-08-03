@@ -3,7 +3,7 @@
 namespace yolo {
 
 auto
-to_string(const float f, const int precision) -> std::string
+toString(const float f, const int precision) -> std::string
 {
   std::ostringstream out;
   out.precision(precision);
@@ -12,22 +12,22 @@ to_string(const float f, const int precision) -> std::string
 }
 
 auto
-draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int>& top5,
-             const std::vector<float>& top5_confs, const std::vector<std::string>& top5_labels,
-             const std::vector<int>& cls_ids, const std::vector<float>& confs, const std::vector<std::string>& labels,
-             const std::vector<cv::Rect>& boxes, const std::vector<int>& track_ids,
-             const std::vector<std::vector<cv::Point>>& tracks) -> cv::Mat
+drawResults(const cv::Mat& image, const DrawParam& param, const std::vector<int>& top5,
+            const std::vector<float>& top5_confs, const std::vector<std::string>& top5_labels,
+            const std::vector<int>& cls_ids, const std::vector<float>& confs, const std::vector<std::string>& labels,
+            const std::vector<cv::Rect>& boxes, const std::vector<int>& track_ids,
+            const std::vector<std::vector<cv::Point>>& tracks) -> cv::Mat
 {
   auto canvas = image.clone();
   // resize or not
 
-  auto colors = get_colors_48();
+  auto colors = getColors48();
   auto colors_num = colors.size();
-  auto font_face = param.font_face;
-  auto font_scale = param.font_scale;
-  auto font_color = param.font_color;
-  auto font_thickness = param.font_thickness;
-  auto font_offset_x = param.box_line_width / 2;
+  auto font_face = param.font_face_;
+  auto font_scale = param.font_scale_;
+  auto font_color = param.font_color_;
+  auto font_thickness = param.font_thickness_;
+  auto font_offset_x = param.box_line_width_ / 2;
   auto font_padding = 8;
 
   // classification task
@@ -36,14 +36,14 @@ draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int
     assert(top5.size() == top5_confs.size());
     assert(top5.size() == top5_labels.size());
 
-    auto num = param.top1_only ? 1 : top5.size();
+    auto num = param.top1_only_ ? 1 : top5.size();
     auto loc = cv::Point(font_padding, font_padding); // start point
     for (size_t i = 0; i < num; i++)
     {
       const auto& color = colors[top5[i] % colors_num];
-      // [rank]: cls_id, conf, label
+      // [rank]: cls_id_, conf, label
       std::string txt = "[rank" + std::to_string(i + 1) +
-                        "]: " + (param.cls_ids ? std::to_string(top5[i]) + ", " : "") + to_string(top5_confs[i] * 100) +
+                        "]: " + (param.cls_ids_ ? std::to_string(top5[i]) + ", " : "") + toString(top5_confs[i] * 100) +
                         "%, " + top5_labels[i];
       // calculate rectangle of txt
       auto baseline = 0;
@@ -61,7 +61,7 @@ draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int
   }
 
   // detection/segmentation/pose tasks
-  if (!tracks.empty() && param.tracks && param.track_line_width > 0)
+  if (!tracks.empty() && param.tracks_ && param.track_line_width_ > 0)
   {
     assert(boxes.size() == cls_ids.size());
     assert(boxes.size() == confs.size());
@@ -71,23 +71,23 @@ draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int
     for (size_t i = 0; i < tracks.size(); i++)
     {
       auto& one_track = tracks[i];
-      auto color = param.color_by_class ? colors[cls_ids[i] % colors_num] : colors[i % colors_num];
+      auto color = param.color_by_class_ ? colors[cls_ids[i] % colors_num] : colors[i % colors_num];
 
       for (size_t j = 0; j + 1 < one_track.size(); j++)
       {
         auto& p1 = one_track[j];
         auto& p2 = one_track[j + 1];
-        cv::line(canvas, p1, p2, color, param.track_line_width, cv::LINE_AA);
+        cv::line(canvas, p1, p2, color, param.track_line_width_, cv::LINE_AA);
 
         // the last one is located point
-        if (j + 2 == one_track.size() && param.loc_radius > 0)
-          cv::circle(canvas, p2, param.loc_radius, color, -1);
+        if (j + 2 == one_track.size() && param.loc_radius_ > 0)
+          cv::circle(canvas, p2, param.loc_radius_, color, -1);
       }
     }
   }
 
   // detection task
-  if (!boxes.empty() && param.boxes && param.box_line_width > 0)
+  if (!boxes.empty() && param.boxes_ && param.box_line_width_ > 0)
   {
     assert(boxes.size() == cls_ids.size());
     assert(boxes.size() == confs.size());
@@ -96,21 +96,21 @@ draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int
 
     for (size_t i = 0; i < boxes.size(); i++)
     {
-      auto color = param.color_by_class ? colors[cls_ids[i] % colors_num] : colors[i % colors_num];
-      cv::rectangle(canvas, boxes[i], color, param.box_line_width);
+      auto color = param.color_by_class_ ? colors[cls_ids[i] % colors_num] : colors[i % colors_num];
+      cv::rectangle(canvas, boxes[i], color, param.box_line_width_);
 
       std::string txt;
-      if (param.track_ids && track_ids[i] >= 0)
+      if (param.track_ids_ && track_ids[i] >= 0)
       {
         // track_id == -1 means no tracked, ignored
         txt += "#" + std::to_string(track_ids[i]);
       }
-      if (param.cls_ids)
+      if (param.cls_ids_)
         txt += (!txt.empty() ? ", " : "") + std::to_string(cls_ids[i]);
-      if (param.labels)
+      if (param.labels_)
         txt += (!txt.empty() ? ", " : "") + labels[i];
-      if (param.confs)
-        txt += (!txt.empty() ? ", " : "") + to_string(confs[i] * 100) + "%";
+      if (param.confs_)
+        txt += (!txt.empty() ? ", " : "") + toString(confs[i] * 100) + "%";
 
       // draw text
       if (!txt.empty())
@@ -133,7 +133,7 @@ draw_results(const cv::Mat& image, const DrawParam& param, const std::vector<int
 }
 
 auto
-get_colors_48() -> std::vector<cv::Scalar>
+getColors48() -> std::vector<cv::Scalar>
 {
   return {
     cv::Scalar(0, 100, 0),    // DarkGreen
@@ -189,8 +189,6 @@ get_colors_48() -> std::vector<cv::Scalar>
 
 YoloUtils::YoloUtils(/* args */) = default;
 
-YoloUtils::~YoloUtils() = default;
-
 auto
 YoloUtils::letterbox(const cv::Mat& img, int new_w, int new_h, LetterBoxInfo& info, const cv::Scalar& color) -> cv::Mat
 {
@@ -216,23 +214,23 @@ YoloUtils::letterbox(const cv::Mat& img, int new_w, int new_h, LetterBoxInfo& in
   cv::Mat padded;
   cv::copyMakeBorder(resized, padded, pad_top, pad_bottom, pad_left, pad_right, cv::BORDER_CONSTANT, color);
 
-  info.scale = r;
-  info.pad_w = pad_left;
-  info.pad_h = pad_top;
+  info.scale_ = r;
+  info.pad_w_ = pad_left;
+  info.pad_h_ = pad_top;
 
   return padded;
 }
 
 void
-YoloUtils::class_aware_nms(const std::vector<cv::Rect>& boxes, const std::vector<float>& scores,
-                           const std::vector<int>& cls_ids, float conf_thresh, float nms_thresh,
-                           std::vector<int>& keep_indices)
+YoloUtils::classAwareNms(const std::vector<cv::Rect>& boxes, const std::vector<float>& scores,
+                         const std::vector<int>& cls_ids, float conf_thresh, float nms_thresh,
+                         std::vector<int>& keep_indices)
 {
   keep_indices.clear();
 
   // class_id -> indices
   std::unordered_map<int, std::vector<int>> cls_map;
-  for (int i = 0; i < (int)cls_ids.size(); ++i)
+  for (int i = 0; i < static_cast<int>(cls_ids.size()); ++i)
     cls_map[cls_ids[i]].push_back(i);
 
   // per-class NMS
@@ -262,15 +260,15 @@ YoloUtils::class_aware_nms(const std::vector<cv::Rect>& boxes, const std::vector
 }
 
 void
-YoloUtils::class_aware_nms(const std::vector<cv::RotatedRect>& rboxes, const std::vector<float>& scores,
-                           const std::vector<int>& cls_ids, float conf_thresh, float nms_thresh,
-                           std::vector<int>& keep_indices)
+YoloUtils::classAwareNms(const std::vector<cv::RotatedRect>& rboxes, const std::vector<float>& scores,
+                         const std::vector<int>& cls_ids, float conf_thresh, float nms_thresh,
+                         std::vector<int>& keep_indices)
 {
   keep_indices.clear();
 
   // class_id -> indices
   std::unordered_map<int, std::vector<int>> cls_map;
-  for (int i = 0; i < (int)cls_ids.size(); ++i)
+  for (int i = 0; i < static_cast<int>(cls_ids.size()); ++i)
     cls_map[cls_ids[i]].push_back(i);
 
   // per-class NMS
@@ -300,7 +298,7 @@ YoloUtils::class_aware_nms(const std::vector<cv::RotatedRect>& rboxes, const std
 }
 
 auto
-YoloUtils::decode_box(float cx, float cy, float w, float h, const LetterBoxInfo& lb, const cv::Size& orig_size)
+YoloUtils::decodeBox(float cx, float cy, float w, float h, const LetterBoxInfo& lb, const cv::Size& orig_size)
   -> cv::Rect
 {
   float x1 = cx - w * 0.5f;
@@ -308,18 +306,17 @@ YoloUtils::decode_box(float cx, float cy, float w, float h, const LetterBoxInfo&
   float x2 = cx + w * 0.5f;
   float y2 = cy + h * 0.5f;
 
-  x1 = (x1 - lb.pad_w) / lb.scale;
-  y1 = (y1 - lb.pad_h) / lb.scale;
-  x2 = (x2 - lb.pad_w) / lb.scale;
-  y2 = (y2 - lb.pad_h) / lb.scale;
+  x1 = (x1 - lb.pad_w_) / lb.scale_;
+  y1 = (y1 - lb.pad_h_) / lb.scale_;
+  x2 = (x2 - lb.pad_w_) / lb.scale_;
+  y2 = (y2 - lb.pad_h_) / lb.scale_;
 
-  x1 = std::clamp(x1, 0.f, (float)orig_size.width - 1.f);
-  y1 = std::clamp(y1, 0.f, (float)orig_size.height - 1.f);
-  x2 = std::clamp(x2, 0.f, (float)orig_size.width - 1.f);
-  y2 = std::clamp(y2, 0.f, (float)orig_size.height - 1.f);
+  x1 = std::clamp(x1, 0.f, static_cast<float>(orig_size.width) - 1.f);
+  y1 = std::clamp(y1, 0.f, static_cast<float>(orig_size.height) - 1.f);
+  x2 = std::clamp(x2, 0.f, static_cast<float>(orig_size.width) - 1.f);
+  y2 = std::clamp(y2, 0.f, static_cast<float>(orig_size.height) - 1.f);
 
-  return {(int)x1, (int)y1, (int)(x2 - x1), (int)(y2 - y1)};
+  return {static_cast<int>(x1), static_cast<int>(y1), static_cast<int>(x2 - x1), static_cast<int>(y2 - y1)};
 }
-
 
 } // namespace yolo

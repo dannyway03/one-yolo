@@ -45,7 +45,6 @@ struct Stats
   double p99_;
   double min_;
   double max_;
-  [[maybe_unused]] double stddev_;
 };
 
 static auto
@@ -67,16 +66,12 @@ computeStats(const std::vector<double>& v) -> Stats
 {
   double sum = std::accumulate(v.begin(), v.end(), 0.0);
   double avg = sum / static_cast<double>(v.size());
-  double sq = 0.0;
-  for (double x : v)
-    sq += (x - avg) * (x - avg);
   return {avg,
           percentile(v, 50.0),
           percentile(v, 95.0),
           percentile(v, 99.0),
           *std::min_element(v.begin(), v.end()),
-          *std::max_element(v.begin(), v.end()),
-          std::sqrt(sq / static_cast<double>(v.size()))};
+          *std::max_element(v.begin(), v.end())};
 }
 
 static auto
@@ -216,8 +211,8 @@ makeFrame(const Args& a, int w, int h) -> cv::Mat
     return img;
   }
   cv::Mat noise(h, w, CV_8UC3);
-  std::mt19937 rng(42);
-  std::uniform_int_distribution<int> dist(0, 255);
+  std::mt19937 rng(42); // NOLINT
+  std::uniform_int_distribution<int> dist(0, 255); // NOLINT
   for (int r = 0; r < noise.rows; ++r)
   {
     for (int c = 0; c < noise.cols; ++c)
@@ -243,7 +238,7 @@ appendCsv(const std::string& path, const Args& a, const YoloConfig& cfg, const S
   std::ofstream f(path, std::ios::app);
   if (write_header)
   {
-    f << "version,backend,device,task,input_w,input_h,classes,iterations,"
+    f << "version,backend,device,task,input_w,input_h,classes_,iterations,"
       << "pre_avg,pre_p95,pre_p99,"
       << "infer_avg,infer_p95,infer_p99,"
       << "post_avg,post_p95,post_p99,"
@@ -273,7 +268,7 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
     std::cout << "task       : " << toString(cfg.task_) << "\n";
     std::cout << "model      : " << cfg.model_path_ << "\n";
     std::cout << "input      : " << cfg.input_w_ << "x" << cfg.input_h_ << "\n";
-    std::cout << "classes    : " << cfg.num_classes_ << "\n";
+    std::cout << "classes_    : " << cfg.num_classes_ << "\n";
     std::cout << "warmup     : " << a.warmup_ << "\n";
     std::cout << "iterations : " << a.iterations_ << "\n";
     std::cout << "image      : " << (a.image_path_.empty() ? "(random noise)" : a.image_path_) << "\n\n";
@@ -330,9 +325,9 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
           last_result = pipe_results[0];
         bidx ^= 1;
 
-        auto ms_of = [](auto a, auto b)
-        {
-          return std::chrono::duration<double, std::milli>(b - a).count();
+        auto ms_of = [](auto aa, auto bb)
+        -> auto {
+          return std::chrono::duration<double, std::milli>(bb - aa).count();
         };
         pre_ms.push_back(ms_of(t0, t1));
         wait_ms.push_back(ms_of(t1, t2));
@@ -362,8 +357,8 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
       std::cout << "\nFPS (1000 / total_avg): " << std::fixed << std::setprecision(1)
                 << (tot.avg_ > 0.0 ? 1000.0 / tot.avg_ : 0.0) << "\n";
       std::cout << "note: 'gpu wait' ~ 0 means full overlap achieved; total ≈ max(pre+post, infer)\n";
-      if (!last_result.detections.empty() || !last_result.classes.empty())
-        std::cout << "detections (last frame): " << last_result.detections.size() << "\n";
+      if (!last_result.detections_.empty() || !last_result.classes_.empty())
+        std::cout << "detections (last frame): " << last_result.detections_.size() << "\n";
       return 0;
     }
 #endif
@@ -386,12 +381,12 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
     {
       auto results = model(batch);
       auto& r = results[0];
-      if (r.speed.size() >= 3)
+      if (r.speed_.size() >= 3)
       {
-        pre_ms.push_back(r.speed[0]);
-        infer_ms.push_back(r.speed[1]);
-        post_ms.push_back(r.speed[2]);
-        total_ms.push_back(r.speed[0] + r.speed[1] + r.speed[2]);
+        pre_ms.push_back(r.speed_[0]);
+        infer_ms.push_back(r.speed_[1]);
+        post_ms.push_back(r.speed_[2]);
+        total_ms.push_back(r.speed_[0] + r.speed_[1] + r.speed_[2]);
       }
       if (i == a.iterations_ - 1)
         last_result = r;
@@ -419,8 +414,8 @@ main(int argc, char** argv) -> int // NOLINT(modernize-avoid-c-arrays)
     std::cout << "\nFPS (1000 / total_avg): " << std::fixed << std::setprecision(1)
               << (total.avg_ > 0.0 ? 1000.0 / total.avg_ : 0.0) << "\n";
 
-    if (!last_result.detections.empty() || !last_result.classes.empty())
-      std::cout << "detections (last frame): " << last_result.detections.size() << "\n";
+    if (!last_result.detections_.empty() || !last_result.classes_.empty())
+      std::cout << "detections (last frame): " << last_result.detections_.size() << "\n";
 
     if (!a.save_path_.empty() && !a.image_path_.empty())
     {

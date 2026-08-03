@@ -10,7 +10,7 @@ class SortTrackAlgo : public BaseTrackAlgo
 private:
   using TrackingBox = struct TrackingBox
   {
-    int id_;
+    int id_{};
     Rect_<float> box_;
   };
 

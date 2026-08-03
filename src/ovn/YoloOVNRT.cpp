@@ -37,7 +37,8 @@ YoloOVNRT::inference(const cv::Mat& blob) -> std::vector<cv::Mat>
   assert(blob.dims == 4);
 
   ov::Tensor input_tensor(ov::element::f32,
-                          {(size_t)blob.size[0], (size_t)blob.size[1], (size_t)blob.size[2], (size_t)blob.size[3]},
+                          {static_cast<size_t>(blob.size[0]), static_cast<size_t>(blob.size[1]),
+                           static_cast<size_t>(blob.size[2]), static_cast<size_t>(blob.size[3])},
                           const_cast<float*>(reinterpret_cast<const float*>(blob.data)));
 
   infer_req_[0].set_input_tensor(input_tensor);
@@ -82,7 +83,8 @@ YoloOVNRT::submit(const cv::Mat& blob)
 
   // Zero-copy: blob must stay valid and unmodified until the matching collect().
   ov::Tensor input_tensor(ov::element::f32,
-                          {(size_t)blob.size[0], (size_t)blob.size[1], (size_t)blob.size[2], (size_t)blob.size[3]},
+                          {static_cast<size_t>(blob.size[0]), static_cast<size_t>(blob.size[1]),
+                           static_cast<size_t>(blob.size[2]), static_cast<size_t>(blob.size[3])},
                           const_cast<float*>(reinterpret_cast<const float*>(blob.data)));
 
   infer_req_[submit_idx_].set_input_tensor(input_tensor);

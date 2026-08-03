@@ -21,11 +21,11 @@ private:
   /* data */
 
 protected:
-  YoloTrackConfig _cfg;
+  YoloTrackConfig _cfg; // NOLINT
 
 public:
   BaseTrackAlgo(const YoloTrackConfig& cfg);
-  ~BaseTrackAlgo();
+  ~BaseTrackAlgo() = default;
 
   /**
    * @brief

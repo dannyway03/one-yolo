@@ -9,7 +9,6 @@
 // by Cong Ma, 2016
 //
 
-#include <iostream>
 #include <vector>
 
 using namespace std;
@@ -20,32 +19,32 @@ class HungarianAlgorithm
 {
 public:
   HungarianAlgorithm();
-  ~HungarianAlgorithm();
-  double
-  Solve(vector<vector<double>>& DistMatrix, vector<int>& Assignment);
+  ~HungarianAlgorithm() = default;
+  auto
+  solve(vector<vector<double>>& dist_matrix, vector<int>& assignment) -> double;
 
 private:
   void
-  assignmentoptimal(int* assignment, double* cost, double* distMatrix, int nOfRows, int nOfColumns);
+  assignmentoptimal(int* assignment, double* cost, double* dist_matrix, int n_of_rows, int n_of_columns);
   void
-  buildassignmentvector(int* assignment, bool* starMatrix, int nOfRows, int nOfColumns);
+  buildassignmentvector(int* assignment, bool* star_matrix, int n_of_rows, int n_of_columns);
   void
-  computeassignmentcost(int* assignment, double* cost, double* distMatrix, int nOfRows);
+  computeassignmentcost(int* assignment, double* cost, double* dist_matrix, int n_of_rows);
   void
-  step2a(int* assignment, double* distMatrix, bool* starMatrix, bool* newStarMatrix, bool* primeMatrix,
-         bool* coveredColumns, bool* coveredRows, int nOfRows, int nOfColumns, int minDim);
+  step2a(int* assignment, double* dist_matrix, bool* star_matrix, bool* new_star_matrix, bool* prime_matrix,
+         bool* covered_columns, bool* covered_rows, int n_of_rows, int n_of_columns, int min_dim);
   void
-  step2b(int* assignment, double* distMatrix, bool* starMatrix, bool* newStarMatrix, bool* primeMatrix,
-         bool* coveredColumns, bool* coveredRows, int nOfRows, int nOfColumns, int minDim);
+  step2b(int* assignment, double* dist_matrix, bool* star_matrix, bool* new_star_matrix, bool* prime_matrix,
+         bool* covered_columns, bool* covered_rows, int n_of_rows, int n_of_columns, int min_dim);
   void
-  step3(int* assignment, double* distMatrix, bool* starMatrix, bool* newStarMatrix, bool* primeMatrix,
-        bool* coveredColumns, bool* coveredRows, int nOfRows, int nOfColumns, int minDim);
+  step3(int* assignment, double* dist_matrix, bool* star_matrix, bool* new_star_matrix, bool* prime_matrix,
+        bool* covered_columns, bool* covered_rows, int n_of_rows, int n_of_columns, int min_dim);
   void
-  step4(int* assignment, double* distMatrix, bool* starMatrix, bool* newStarMatrix, bool* primeMatrix,
-        bool* coveredColumns, bool* coveredRows, int nOfRows, int nOfColumns, int minDim, int row, int col);
+  step4(int* assignment, double* dist_matrix, bool* star_matrix, bool* new_star_matrix, bool* prime_matrix,
+        bool* covered_columns, bool* covered_rows, int n_of_rows, int n_of_columns, int min_dim, int row, int col);
   void
-  step5(int* assignment, double* distMatrix, bool* starMatrix, bool* newStarMatrix, bool* primeMatrix,
-        bool* coveredColumns, bool* coveredRows, int nOfRows, int nOfColumns, int minDim);
+  step5(int* assignment, double* dist_matrix, bool* star_matrix, bool* new_star_matrix, bool* prime_matrix,
+        bool* covered_columns, bool* covered_rows, int n_of_rows, int n_of_columns, int min_dim);
 };
 
 } // namespace yolo

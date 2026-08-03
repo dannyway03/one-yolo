@@ -8,7 +8,9 @@ OUTPUT_DIR="$PROJECT_ROOT/results/clang-tidy"
 CONFIG="$PROJECT_ROOT/.clang-tidy"
 FIXES="$OUTPUT_DIR/fixes.yaml"
 LOG="$OUTPUT_DIR/clang-tidy.log"
-COMPILE_DB="$PROJECT_ROOT/build/Release/compile_commands.json"
+COMPILE_DB="$PROJECT_ROOT/build/Release"
+
+# compile_commands.json"
 
 # Default search targets; override by passing dirs/files as arguments
 if [[ $# -eq 0 ]]; then
@@ -32,7 +34,7 @@ EOF
 }
 
 [[ -f "$CONFIG" ]]      || { echo "ERROR: .clang-tidy not found at $CONFIG"; exit 1; }
-[[ -f "$COMPILE_DB" ]]  || { echo "ERROR: compile_commands.json not found at $COMPILE_DB"; exit 1; }
+[[ -f "$COMPILE_DB/compile_commands.json" ]]  || { echo "ERROR: compile_commands.json not found at $COMPILE_DB"; exit 1; }
 
 mkdir -p "$OUTPUT_DIR"
 rm -f "$FIXES"
@@ -50,11 +52,15 @@ echo   "  log          : $LOG"
 echo   "  fixes        : $FIXES"
 echo
 
-printf '%s\n' "${FILES[@]}" | xargs clang-tidy-20 \
-    --config-file="$CONFIG" \
+printf '%s\n' "${FILES[@]}" | xargs run-clang-tidy-20 \
+    -clang-tidy-binary clang-tidy-20 \
+    -clang-apply-replacements-binary clang-apply-replacements-20 \
+    -config-file "$CONFIG" \
     -p "$COMPILE_DB" \
-    --header-filter='^(?!.*/nlohmann/).*' \
-    --export-fixes="$FIXES" \
+    -export-fixes "$FIXES" \
+    -j 6 \
+    -format \
+    -style file \
     2>&1 | tee "$LOG"
 
 echo

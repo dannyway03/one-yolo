@@ -15,7 +15,7 @@ SortTrackAlgo::getIOU(cv::Rect_<float> bb_test, cv::Rect_<float> bb_gt) -> doubl
   if (un < DBL_EPSILON)
     return 0;
 
-  return (double)(in / un);
+  return static_cast<double>(in / un);
 }
 
 void
@@ -77,7 +77,7 @@ SortTrackAlgo::run(const std::vector<cv::Rect>& boxes, const std::vector<std::ve
   // the resulting assignment_ is [track(prediction) : detection], with len=preNum
   HungarianAlgorithm hung_algo;
   assignment_.clear();
-  hung_algo.Solve(iou_matrix_, assignment_);
+  hung_algo.solve(iou_matrix_, assignment_);
 
   // find matches, unmatched_detections and unmatched_predictions
   unmatched_trajectories_.clear();
@@ -114,7 +114,7 @@ SortTrackAlgo::run(const std::vector<cv::Rect>& boxes, const std::vector<std::ve
   {
     if (assignment_[i] == -1) // pass over invalid values
       continue;
-    if (1 - iou_matrix_[i][assignment_[i]] < _cfg.iou_thresh)
+    if (1 - iou_matrix_[i][assignment_[i]] < _cfg.iou_thresh_)
     {
       unmatched_trajectories_.insert(i);
       unmatched_detections_.insert(assignment_[i]);
@@ -129,10 +129,10 @@ SortTrackAlgo::run(const std::vector<cv::Rect>& boxes, const std::vector<std::ve
   // update matched trackers_ with assigned detections.
   // each prediction is corresponding to a tracker_
   int det_idx, trk_idx;
-  for (auto& matchedPair : matched_pairs_)
+  for (auto& matched_pair : matched_pairs_)
   {
-    trk_idx = matchedPair.x;
-    det_idx = matchedPair.y;
+    trk_idx = matched_pair.x;
+    det_idx = matched_pair.y;
     trackers_[trk_idx].update(
       cv::Rect_<float>(boxes[det_idx].x, boxes[det_idx].y, boxes[det_idx].width, boxes[det_idx].height));
   }
@@ -140,19 +140,19 @@ SortTrackAlgo::run(const std::vector<cv::Rect>& boxes, const std::vector<std::ve
   // create and initialise new trackers_ for unmatched detections
   for (auto& umd : unmatched_detections_)
   {
-    auto tracker_ = KalmanTracker(cv::Rect_<float>(boxes[umd].x, boxes[umd].y, boxes[umd].width, boxes[umd].height));
-    trackers_.emplace_back(tracker_);
+    auto tracker = KalmanTracker(cv::Rect_<float>(boxes[umd].x, boxes[umd].y, boxes[umd].width, boxes[umd].height));
+    trackers_.emplace_back(tracker);
   }
 
   // get trackers_' output
   frame_tracking_result_.clear();
   for (auto it = trackers_.begin(); it != trackers_.end();)
   {
-    if (((*it).m_time_since_update < 1) && ((*it).m_hit_streak >= _cfg.min_hits))
+    if (((*it).m_time_since_update_ < 1) && ((*it).m_hit_streak_ >= _cfg.min_hits_))
     {
       TrackingBox res;
-      res.box_ = (*it).get_state();
-      res.id_ = (*it).m_id + 1;
+      res.box_ = (*it).getState();
+      res.id_ = (*it).m_id_ + 1;
       frame_tracking_result_.emplace_back(res);
       it++;
     }
@@ -160,7 +160,7 @@ SortTrackAlgo::run(const std::vector<cv::Rect>& boxes, const std::vector<std::ve
       it++;
 
     // remove dead tracker_
-    if (it != trackers_.end() && (*it).m_time_since_update > _cfg.max_miss)
+    if (it != trackers_.end() && (*it).m_time_since_update_ > _cfg.max_miss_)
       it = trackers_.erase(it);
   }
 
